@@ -12275,14 +12275,29 @@ function filterCustomers(q) {
 }
 
 async function deleteCustomer(id, name) {
-  if (!confirm(`Remove "${name}" from your customer list? Their points, history and login account are kept — they'll just disappear from here unless they open the app again.`)) return;
+  if (!confirm(`Remove "${name}" permanently?\n\nThis will delete their profile, points history, bookings, and notifications. They will no longer appear anywhere in the dashboard. This cannot be undone.`)) return;
+
+  // Delete all related data first
+  await Promise.all([
+    db.from('points_history').delete().eq('customer_id', id),
+    db.from('notifications').delete().eq('customer_id', id),
+    db.from('bookings').delete().eq('customer_id', id),
+    db.from('push_subscriptions').delete().eq('customer_id', id),
+  ]);
+
   const { error } = await db.from('profiles').delete().eq('id', id);
   if (error) { toast('Error: ' + error.message); return; }
+
+  // Remove from all in-memory lists
   adminData.customers = adminData.customers.filter(c => c.id !== id);
+  adminData.bookings  = adminData.bookings.filter(b => b.customer_id !== id);
+
+  // Refresh every panel that shows customer data
   filterCustomers(document.querySelector('#panel-customers .search-wrap input')?.value || '');
   populateQuickCustomerDropdown();
+  renderReservationsTable();
   if (currentPanelName === 'overview') renderOverview();
-  toast('🗑 ' + name + ' removed from customer list');
+  toast('🗑 ' + name + ' removed');
 }
 
 // ════════════════════════════════════════
