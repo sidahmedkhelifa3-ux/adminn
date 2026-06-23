@@ -11497,6 +11497,10 @@ function subscribeRealtime() {
       }
       renderCurrentPanel();
     })
+    .on('postgres_changes', { event:'DELETE', schema:'public', table:'bookings' }, payload => {
+      adminData.bookings = adminData.bookings.filter(b => String(b.id) !== String(payload.old.id));
+      renderCurrentPanel();
+    })
     .on('postgres_changes', { event:'INSERT', schema:'public', table:'support_requests' }, payload => {
       adminData.supportRequests.unshift(payload.new);
       updateSupportBadge();
@@ -11506,9 +11510,18 @@ function subscribeRealtime() {
       renderCurrentPanel();
     })
     .on('postgres_changes', { event:'UPDATE', schema:'public', table:'profiles' }, payload => {
+      // Guard: ignore updates for customers that were just deleted locally
       const i = adminData.customers.findIndex(c => c.id === payload.new.id);
-      if (i !== -1) Object.assign(adminData.customers[i], payload.new);
-      else adminData.customers.unshift(payload.new);
+      if (i !== -1) {
+        Object.assign(adminData.customers[i], payload.new);
+        populateQuickCustomerDropdown();
+        renderCurrentPanel();
+      }
+      // Do NOT re-add if not found — it may have just been deleted
+    })
+    .on('postgres_changes', { event:'DELETE', schema:'public', table:'profiles' }, payload => {
+      adminData.customers = adminData.customers.filter(c => c.id !== payload.old.id);
+      adminData.bookings  = adminData.bookings.filter(b => b.customer_id !== payload.old.id);
       populateQuickCustomerDropdown();
       renderCurrentPanel();
     })
@@ -13020,7 +13033,7 @@ async function tryAdminUnlock() {
   if (btn) { btn.disabled = false; btn.textContent = 'Unlock'; }
 
   if (entered === currentPassword) {
-    sessionStorage.setItem('heycat_admin_unlocked', 'true');
+    localStorage.setItem('heycat_admin_unlocked', 'true');
     const lock = document.getElementById('admin-lock');
     if (lock) lock.style.display = 'none';
     bootAdminApp();
@@ -13037,7 +13050,7 @@ window.onload = () => {
   const lock = document.getElementById('admin-lock');
   const input = document.getElementById('admin-lock-input');
 
-  if (sessionStorage.getItem('heycat_admin_unlocked') === 'true') {
+  if (localStorage.getItem('heycat_admin_unlocked') === 'true') {
     // Already unlocked this browser session — skip straight to the dashboard
     if (lock) lock.style.display = 'none';
     bootAdminApp();
