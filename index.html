@@ -11742,6 +11742,14 @@ async function deleteBooking(id) {
   if (!confirm('Delete this reservation permanently? This cannot be undone.')) return;
   const { error } = await db.from('bookings').delete().eq('id', id);
   if (error) { toast('❌ Error: ' + error.message); return; }
+
+  // Verify the row is actually gone (catches silent RLS failures)
+  const { data: check } = await db.from('bookings').select('id').eq('id', id).maybeSingle();
+  if (check) {
+    toast('❌ Delete failed — check your Supabase RLS policies for the bookings table.');
+    return;
+  }
+
   adminData.bookings = adminData.bookings.filter(b => String(b.id) !== String(id));
   renderReservationsTable();
   if (currentPanelName === 'overview') renderOverview();
@@ -12291,15 +12299,24 @@ async function deleteCustomer(id, name) {
   if (!confirm(`Remove "${name}" permanently?\n\nThis will delete their profile, points history, bookings, and notifications. They will no longer appear anywhere in the dashboard. This cannot be undone.`)) return;
 
   // Delete all related data first
-  await Promise.all([
+  const relatedResults = await Promise.all([
     db.from('points_history').delete().eq('customer_id', id),
     db.from('notifications').delete().eq('customer_id', id),
     db.from('bookings').delete().eq('customer_id', id),
     db.from('push_subscriptions').delete().eq('customer_id', id),
   ]);
+  const relatedError = relatedResults.find(r => r.error);
+  if (relatedError) { toast('❌ Error deleting related data: ' + relatedError.error.message); return; }
 
   const { error } = await db.from('profiles').delete().eq('id', id);
   if (error) { toast('Error: ' + error.message); return; }
+
+  // Verify the row is actually gone (catches silent RLS failures)
+  const { data: check } = await db.from('profiles').select('id').eq('id', id).maybeSingle();
+  if (check) {
+    toast('❌ Delete failed — check your Supabase RLS policies for the profiles table.');
+    return;
+  }
 
   // Remove from all in-memory lists
   adminData.customers = adminData.customers.filter(c => c.id !== id);
