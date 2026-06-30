@@ -10,6 +10,12 @@
 
 <!-- ═══ SUPABASE — paste your URL and KEY here ═══ -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- Same EmailJS account used by the customer app (for sending news emails to subscribers) -->
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script>emailjs.init('26J7ohmBPbwZM0KPk');</script>
+<!-- Cropper.js — used for the photo crop/adjust step on Menu, Gift Card, and News photo uploads -->
+<link href="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.js"></script>
 <script>
   const SUPABASE_URL = 'https://dwemfkxegzuwvlmzzfnd.supabase.co';
   const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR3ZW1ma3hlZ3p1d3ZsbXp6Zm5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3OTcwMzgsImV4cCI6MjA5NzM3MzAzOH0.b-XGUZxq2_OmT7qgcsCI7HwD2ZbwsKqP5V_97Gok-QA';                     // ← replace this
@@ -11037,6 +11043,30 @@ html,body{height:100%;font-family:'Inter',sans-serif;color:var(--text);backgroun
       <div id="gc-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px"></div>
     </div>
 
+    <!-- ── Photo Crop Modal (shared by Menu, Gift Card, and News photo uploads) ── -->
+    <div id="crop-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:2000"></div>
+    <div id="crop-modal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:16px;padding:24px;width:min(540px,94vw);z-index:2001;box-shadow:0 20px 60px rgba(0,0,0,0.3)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div style="font-size:18px;font-weight:700;color:var(--brown)">Crop & Adjust Photo</div>
+        <button onclick="cancelCrop()" style="border:none;background:none;font-size:20px;cursor:pointer;color:var(--muted)">✕</button>
+      </div>
+      <div id="crop-size-hint" style="background:var(--beige);border-radius:8px;padding:9px 12px;font-size:12.5px;color:var(--brown);margin-bottom:14px;line-height:1.4"></div>
+      <div style="width:100%;height:360px;background:#1a1a1a;border-radius:10px;overflow:hidden">
+        <img id="crop-image" src="" alt="" style="display:block;max-width:100%">
+      </div>
+      <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+        <button type="button" id="crop-ratio-app" class="btn btn-ghost btn-sm" onclick="setCropAspectMode('app')">📱 App Size</button>
+        <button type="button" id="crop-ratio-free" class="btn btn-ghost btn-sm" onclick="setCropAspectMode('free')">Free</button>
+        <div style="flex:1"></div>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="rotateCrop(-90)" title="Rotate left">⟲</button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="rotateCrop(90)" title="Rotate right">⟳</button>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="cancelCrop()">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="confirmCrop()">Apply Crop</button>
+      </div>
+    </div>
+
     <!-- ── Add/Edit Gift Card Modal ── -->
     <div id="gc-modal-overlay" onclick="closeGiftCardModal()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000"></div>
     <div id="gc-modal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:16px;padding:28px;width:min(480px,94vw);z-index:1001;box-shadow:0 20px 60px rgba(0,0,0,0.2)">
@@ -11922,11 +11952,7 @@ function closeGiftCardModal() {
 
 function previewGCImage(input) {
   if (!input.files || !input.files[0]) return;
-  gcImageFile = input.files[0];
-  const url = URL.createObjectURL(gcImageFile);
-  document.getElementById('gc-img-tag').src = url;
-  document.getElementById('gc-img-tag').style.display = 'block';
-  document.getElementById('gc-img-placeholder').style.display = 'none';
+  openCropModal(input.files[0], 'giftcard');
 }
 
 async function saveGiftCard() {
@@ -12084,11 +12110,7 @@ function closePostModal() {
 
 function previewPostImage(input) {
   if (!input.files || !input.files[0]) return;
-  hpImageFile = input.files[0];
-  const url = URL.createObjectURL(hpImageFile);
-  document.getElementById('hp-img-tag').src = url;
-  document.getElementById('hp-img-tag').style.display = 'block';
-  document.getElementById('hp-img-placeholder').style.display = 'none';
+  openCropModal(input.files[0], 'news');
 }
 
 async function savePost() {
@@ -12179,6 +12201,47 @@ async function notifyAllOfNewPost(title, body) {
   } catch (e) {
     console.warn('[HEYCAT ADMIN] Could not reach push function:', e);
   }
+
+  // 3. Email every customer who opted in at sign-up (and has a real email —
+  // phone-signup accounts have no usable address, so they're excluded by
+  // the `.not('email','is',null)` / non-empty checks below).
+  try {
+    const { data: subscribers, error: subErr } = await db.from('profiles')
+      .select('email, name')
+      .eq('email_opt_in', true)
+      .not('email', 'is', null)
+      .neq('email', '');
+    if (subErr) throw subErr;
+
+    if (subscribers && subscribers.length) {
+      const EMAILJS_SERVICE_ID  = 'service_ykkizq5';
+      // TODO: create a dedicated "news update" template in your EmailJS
+      // dashboard (the gift-card template is wrong for this — different
+      // wording) and paste its ID here. Give the template these variables:
+      // {{to_email}}, {{to_name}}, {{subject}}, {{message}}.
+      const EMAILJS_NEWS_TEMPLATE_ID = 'template_zqsc2oh';
+      const EMAILJS_PUBLIC_KEY  = '26J7ohmBPbwZM0KPk';
+
+      let sent = 0, failed = 0;
+      for (const sub of subscribers) {
+        try {
+          await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_NEWS_TEMPLATE_ID, {
+            to_email: sub.email,
+            to_name:  sub.name || 'there',
+            subject:  pushTitle,
+            message:  pushBody,
+          }, EMAILJS_PUBLIC_KEY);
+          sent++;
+        } catch (e) {
+          failed++;
+          console.warn('[HEYCAT ADMIN] News email failed for', sub.email, e);
+        }
+      }
+      console.log(`[HEYCAT ADMIN] News emails: ${sent} sent, ${failed} failed`);
+    }
+  } catch (e) {
+    console.warn('[HEYCAT ADMIN] Could not load email subscribers:', e);
+  }
 }
 
 async function deletePost(id) {
@@ -12255,6 +12318,136 @@ function filterMenuItems(q) { renderMenuTable(); }
 function filterMenuCat(c)   { renderMenuTable(); }
 
 // ════════════════════════════════════════
+// PHOTO CROP MODAL (shared by Menu, Gift Card, and News photo uploads)
+// ════════════════════════════════════════
+let cropperInstance     = null;
+let cropTargetContext   = null; // 'menu' | 'giftcard' | 'news'
+let cropOriginalInputId = null;
+
+const CROP_CONTEXT_INPUT_ID = { menu: 'mi-photo-input', giftcard: 'gc-img-input', news: 'hp-img-input' };
+
+// Real on-screen sizes pulled straight from the customer app's own CSS, so
+// the crop ratio here matches exactly what gets shown there — no guessing.
+const CROP_CONTEXT_CONFIG = {
+  // Menu item card (.product-card / .product-img-wrap): 190px wide, 190px tall image area
+  menu: {
+    w: 190, h: 190,
+    hint: '📱 In the app, this shows as a <b>square</b> menu card — about <b>190 × 190px</b>.',
+  },
+  // Gift card list thumbnail (180px wide card, 112px tall image area)
+  giftcard: {
+    w: 180, h: 112,
+    hint: '📱 In the app, this shows in the gift card list — about <b>180 × 112px</b> (the detail page also shows it taller, up to 260px, so leave a little breathing room top/bottom).',
+  },
+  // Home Feed banner: fixed 200px tall, full-width up to the app's 430px frame
+  news: {
+    w: 430, h: 200,
+    hint: '📱 In the app, this shows as a full-width Home Feed banner — about <b>430 × 200px</b> on most phones (height is fixed, width stretches to fit the screen).',
+  },
+};
+
+function openCropModal(file, context) {
+  cropTargetContext   = context;
+  cropOriginalInputId = CROP_CONTEXT_INPUT_ID[context];
+  const config = CROP_CONTEXT_CONFIG[context];
+  const appRatio = config.w / config.h;
+
+  const hintEl = document.getElementById('crop-size-hint');
+  if (hintEl) hintEl.innerHTML = config.hint;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = document.getElementById('crop-image');
+    img.src = e.target.result;
+    document.getElementById('crop-modal-overlay').style.display = 'block';
+    document.getElementById('crop-modal').style.display = 'block';
+
+    if (cropperInstance) { cropperInstance.destroy(); cropperInstance = null; }
+    // Cropper needs the image actually loaded in the DOM before it initializes
+    img.onload = () => {
+      cropperInstance = new Cropper(img, {
+        aspectRatio: appRatio,
+        viewMode: 1,
+        autoCropArea: 1,
+        background: false,
+        responsive: true,
+      });
+      // Default to "App Size" mode, locked to the exact ratio used in the app
+      setCropAspectMode('app');
+    };
+  };
+  reader.readAsDataURL(file);
+}
+
+function setCropAspectMode(mode) {
+  if (!cropperInstance) return;
+  const config = CROP_CONTEXT_CONFIG[cropTargetContext];
+  const appRatio = config.w / config.h;
+  cropperInstance.setAspectRatio(mode === 'app' ? appRatio : NaN);
+
+  const appBtn  = document.getElementById('crop-ratio-app');
+  const freeBtn = document.getElementById('crop-ratio-free');
+  [appBtn, freeBtn].forEach(b => { b.style.background = 'transparent'; b.style.color = 'var(--brown)'; });
+  const activeBtn = mode === 'app' ? appBtn : freeBtn;
+  activeBtn.style.background = 'var(--brown)';
+  activeBtn.style.color = 'white';
+}
+
+function rotateCrop(deg) {
+  if (cropperInstance) cropperInstance.rotate(deg);
+}
+
+function closeCropModal() {
+  if (cropperInstance) { cropperInstance.destroy(); cropperInstance = null; }
+  document.getElementById('crop-modal-overlay').style.display = 'none';
+  document.getElementById('crop-modal').style.display = 'none';
+  document.getElementById('crop-image').src = '';
+}
+
+function cancelCrop() {
+  // Reset the triggering file input so selecting the same file again still fires onchange
+  if (cropOriginalInputId) {
+    const input = document.getElementById(cropOriginalInputId);
+    if (input) input.value = '';
+  }
+  closeCropModal();
+}
+
+function confirmCrop() {
+  if (!cropperInstance) return;
+  // Export at the real app size (x2 for retina-sharp display) rather than
+  // whatever resolution the crop box happens to be on screen.
+  const config = CROP_CONTEXT_CONFIG[cropTargetContext];
+  const exportW = config.w * 2;
+  const exportH = config.h * 2;
+  cropperInstance.getCroppedCanvas({ width: exportW, height: exportH, imageSmoothingQuality: 'high' }).toBlob((blob) => {
+    if (!blob) { toast('❌ Crop failed — please try again'); return; }
+    const croppedFile = new File([blob], `cropped-${Date.now()}.jpg`, { type: 'image/jpeg' });
+    applyCroppedPhoto(cropTargetContext, croppedFile);
+    closeCropModal();
+  }, 'image/jpeg', 0.92);
+}
+
+/** Routes the cropped photo back into whichever upload flow triggered the crop. */
+function applyCroppedPhoto(context, file) {
+  if (context === 'menu') {
+    uploadMenuItemPhotoFile(file);
+  } else if (context === 'giftcard') {
+    gcImageFile = file;
+    const url = URL.createObjectURL(file);
+    document.getElementById('gc-img-tag').src = url;
+    document.getElementById('gc-img-tag').style.display = 'block';
+    document.getElementById('gc-img-placeholder').style.display = 'none';
+  } else if (context === 'news') {
+    hpImageFile = file;
+    const url = URL.createObjectURL(file);
+    document.getElementById('hp-img-tag').src = url;
+    document.getElementById('hp-img-tag').style.display = 'block';
+    document.getElementById('hp-img-placeholder').style.display = 'none';
+  }
+}
+
+// ════════════════════════════════════════
 // MENU ITEM PHOTO UPLOAD (Supabase Storage)
 // ════════════════════════════════════════
 const MENU_IMAGE_BUCKET = 'menu-images';
@@ -12286,12 +12479,15 @@ function removeMenuItemPhoto() {
   if (input) input.value = '';
 }
 
-async function handleMenuItemPhotoSelect(event) {
+function handleMenuItemPhotoSelect(event) {
   const file = event.target.files && event.target.files[0];
   if (!file) return;
   if (!file.type.startsWith('image/')) { toast('❌ Please select an image file'); return; }
   if (file.size > 5 * 1024 * 1024) { toast('❌ Image must be under 5MB'); return; }
+  openCropModal(file, 'menu'); // square crop — matches the 190x190 product card image in the app
+}
 
+async function uploadMenuItemPhotoFile(file) {
   const overlay = document.getElementById('mi-photo-uploading');
   if (overlay) overlay.classList.add('active');
   menuItemImageUploading = true;
@@ -13124,6 +13320,28 @@ async function confirmScanPoints() {
     c.points = newPts; c.tier = newTier; c.drink_progress = newDrinkProgress;
     populateQuickCustomerDropdown();
     renderCustomersTable();
+
+    // ── Notify the customer on their phone (in-app bell + push) ──
+    const notifTitle = '⭐ Points Added!';
+    const notifBody  = `+${pts.toLocaleString()} DA added for ${itemsSummary}`;
+    try {
+      await db.from('notifications').insert({
+        customer_id: customerId, icon: '⭐', title: notifTitle, body: notifBody,
+      });
+      const { data: { session } } = await db.auth.getSession();
+      const token = session?.access_token;
+      await fetch(`${SUPABASE_URL}/functions/v1/send-push`, {
+        method: 'POST',
+        headers: {
+          'Content-Type':  'application/json',
+          'Authorization': `Bearer ${token || SUPABASE_KEY}`,
+        },
+        body: JSON.stringify({ title: notifTitle, body: notifBody, icon: '⭐', customer_id: customerId }),
+      });
+    } catch (e) {
+      // Don't let a failed notification undo an already-successful points award
+      console.warn('[HEYCAT] Could not notify customer:', e);
+    }
 
     const scanResult = document.getElementById('scan-result');
     if (scanResult) scanResult.innerHTML = `<div style="padding:20px;text-align:center;color:var(--muted)"><div style="font-size:32px;margin-bottom:8px">🎉</div>✅ +${pts.toLocaleString()} DA added for ${c.name}!<br><span style="font-size:12px">${itemsSummary}</span></div>`;
