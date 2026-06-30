@@ -12722,6 +12722,7 @@ function filterCustomers(q) {
       <td>
         <div style="display:flex;gap:6px">
           <button onclick="addBonusPoints('${c.id}','${(c.name||'').replace(/'/g,"\\'")}')" style="border:1.5px solid var(--brown);background:transparent;color:var(--brown);border-radius:6px;padding:5px 10px;font-size:11px;cursor:pointer;font-weight:600">+ Amount</button>
+          <button onclick="redeemFreeDrink('${c.id}','${(c.name||'').replace(/'/g,"\\'")}')" style="border:1.5px solid var(--gold);background:transparent;color:var(--gold);border-radius:6px;padding:5px 10px;font-size:11px;cursor:pointer;font-weight:600">🎁 Redeem</button>
           <button onclick="deleteCustomer('${c.id}','${(c.name||'').replace(/'/g,"\\'")}')" style="border:none;background:#FEE2E2;color:var(--error);border-radius:6px;padding:5px 10px;font-size:11px;cursor:pointer;font-weight:600">Remove</button>
         </div>
       </td>
@@ -13108,8 +13109,9 @@ async function confirmScanPoints() {
   try {
     const newPts  = (c.points||0) + pts;
     const newTier = calculateTier(newPts);
+    const newDrinkProgress = (c.drink_progress||0) + pts;
 
-    const { error } = await db.from('profiles').update({ points: newPts, tier: newTier }).eq('id', customerId);
+    const { error } = await db.from('profiles').update({ points: newPts, tier: newTier, drink_progress: newDrinkProgress }).eq('id', customerId);
     if (error) throw error;
 
     const itemsSummary = selectedItems.map(i => i.name).join(', ');
@@ -13119,7 +13121,7 @@ async function confirmScanPoints() {
     if (historyErr) throw historyErr;
 
     // Update local state instantly
-    c.points = newPts; c.tier = newTier;
+    c.points = newPts; c.tier = newTier; c.drink_progress = newDrinkProgress;
     populateQuickCustomerDropdown();
     renderCustomersTable();
 
@@ -13202,16 +13204,38 @@ async function addBonusPoints(customerId, name, ptsOverride) {
   if (!c) return;
   const newPts  = (c.points||0) + pts;
   const newTier = calculateTier(newPts);
-  const { error } = await db.from('profiles').update({ points: newPts, tier: newTier }).eq('id', customerId);
+  const newDrinkProgress = (c.drink_progress||0) + pts;
+  const { error } = await db.from('profiles').update({ points: newPts, tier: newTier, drink_progress: newDrinkProgress }).eq('id', customerId);
   if (error) { toast('Error: ' + error.message); return; }
   await db.from('points_history').insert({ customer_id: customerId, type:'earn', description:'Admin bonus', pts });
-  c.points = newPts; c.tier = newTier;
+  c.points = newPts; c.tier = newTier; c.drink_progress = newDrinkProgress;
   populateQuickCustomerDropdown();
   renderCustomersTable();
   // Clear quick pts input
   const qp = document.getElementById('quick-pts');
   if (qp) qp.value = '';
   toast(`✅ Added ${pts.toLocaleString()} DA to ${name}`);
+}
+
+// Manually reset a customer's free-drink progress bar to 0.
+// This does NOT touch `points` or `tier` — those stay lifetime/cumulative.
+// Only triggered by staff, never automatic.
+async function redeemFreeDrink(customerId, name) {
+  const c = adminData.customers.find(c => c.id === customerId);
+  if (!c) return;
+  const current = c.drink_progress || 0;
+  if (!confirm(`Reset ${name}'s free-drink progress to 0?\n\nCurrent progress: ${current.toLocaleString()} DA\n\nOnly do this after the free drink has actually been handed over.`)) return;
+
+  const { error } = await db.from('profiles').update({ drink_progress: 0 }).eq('id', customerId);
+  if (error) { toast('Error: ' + error.message); return; }
+
+  await db.from('points_history').insert({
+    customer_id: customerId, type: 'redeem', description: 'Free drink redeemed', pts: -current
+  });
+
+  c.drink_progress = 0;
+  renderCustomersTable();
+  toast(`🎁 Free drink redeemed for ${name} — progress reset to 0`);
 }
 
 // ════════════════════════════════════════
@@ -13412,9 +13436,10 @@ async function completeCounterOrder() {
   try {
     const newPts  = (c.points || 0) + pts;
     const newTier = calculateTier(newPts);
+    const newDrinkProgress = (c.drink_progress || 0) + pts;
 
     const { error: profileErr } = await db.from('profiles')
-      .update({ points: newPts, tier: newTier })
+      .update({ points: newPts, tier: newTier, drink_progress: newDrinkProgress })
       .eq('id', c.id);
     if (profileErr) throw profileErr;
 
@@ -13430,6 +13455,7 @@ async function completeCounterOrder() {
     // Update local state
     c.points = newPts;
     c.tier   = newTier;
+    c.drink_progress = newDrinkProgress;
     populateQuickCustomerDropdown();
     renderCustomersTable();
 
