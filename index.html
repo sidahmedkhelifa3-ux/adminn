@@ -65,7 +65,7 @@
   // NOTE: this is a basic deterrent only, not real security — anyone who views the page
   // source can read this password. It keeps casual visitors out of a shared link, but
   // does not replace proper authentication for sensitive data. Change this value before sharing.
-  const ADMIN_PASSWORD = 'heycat2026';
+  window.ADMIN_PASSWORD = 'heycat2026';
 </script>
 
 <!-- ═══ QR CODE SCANNER (embedded, no external CDN — works fully offline) ═══ -->
@@ -10878,8 +10878,11 @@ html,body{height:100%;font-family:'Inter',sans-serif;color:var(--text);backgroun
   <div class="nav-item active" onclick="switchPanel('overview',this)">
     <span class="nav-icon">📊</span> Overview
   </div>
-  <div class="nav-item" onclick="switchPanel('reservations',this)">
-    <span class="nav-icon">📅</span> Reservations
+  <div class="nav-item" onclick="switchPanel('giftcards',this)">
+    <span class="nav-icon">🎁</span> Gift Cards
+  </div>
+  <div class="nav-item" onclick="switchPanel('homeposts',this)">
+    <span class="nav-icon">📰</span> Home Posts
   </div>
 
   <div class="sidebar-section-label">MANAGEMENT</div>
@@ -10915,8 +10918,8 @@ html,body{height:100%;font-family:'Inter',sans-serif;color:var(--text);backgroun
   <button class="mnav-item active" onclick="switchPanel('overview',this)" data-panel="overview">
     <span class="mnav-icon">📊</span><span class="mnav-label">Overview</span>
   </button>
-  <button class="mnav-item" onclick="switchPanel('reservations',this)" data-panel="reservations">
-    <span class="mnav-icon">📅</span><span class="mnav-label">Reservations</span>
+  <button class="mnav-item" onclick="switchPanel('giftcards',this)" data-panel="giftcards">
+    <span class="mnav-icon">🎁</span><span class="mnav-label">Gift Cards</span>
   </button>
   <button class="mnav-item" onclick="switchPanel('scanner',this)" data-panel="scanner">
     <span class="mnav-icon">📷</span><span class="mnav-label">Scan</span>
@@ -10939,6 +10942,9 @@ html,body{height:100%;font-family:'Inter',sans-serif;color:var(--text);backgroun
   </button>
   <button class="mmore-row nav-item" onclick="switchPanel('rewards',this);toggleMoreMenu()">
     <span class="nav-icon">⭐</span> Rewards
+  </button>
+  <button class="mmore-row nav-item" onclick="switchPanel('homeposts',this);toggleMoreMenu()">
+    <span class="nav-icon">📰</span> Home Posts
   </button>
   <button class="mmore-row nav-item" onclick="switchPanel('support',this);toggleMoreMenu()">
     <span class="nav-icon">🆘</span> Support
@@ -10976,15 +10982,15 @@ html,body{height:100%;font-family:'Inter',sans-serif;color:var(--text);backgroun
           <div class="stat-lbl">Registered Customers</div>
           <div class="stat-delta up">↑ 1 this week</div>
         </div>
-        <div class="stat-card" data-icon="📅">
-          <div class="stat-val" id="ov-reservations">2</div>
-          <div class="stat-lbl">Upcoming Reservations</div>
-          <div class="stat-delta neutral">Next: Jun 15</div>
+        <div class="stat-card" data-icon="🎁">
+          <div class="stat-val" id="ov-giftcards">0</div>
+          <div class="stat-lbl">Gift Card Designs</div>
+          <div class="stat-delta neutral">Across all categories</div>
         </div>
-        <div class="stat-card" data-icon="🗓️">
-          <div class="stat-val" id="ov-reservations-today">0</div>
-          <div class="stat-lbl">Reservations Today</div>
-          <div class="stat-delta neutral">Across all tables</div>
+        <div class="stat-card" data-icon="📂">
+          <div class="stat-val" id="ov-giftcard-cats">0</div>
+          <div class="stat-lbl">Gift Card Categories</div>
+          <div class="stat-delta neutral">Available to customers</div>
         </div>
         <div class="stat-card" data-icon="☕">
           <div class="stat-val" id="ov-menu-count">0</div>
@@ -10993,7 +10999,7 @@ html,body{height:100%;font-family:'Inter',sans-serif;color:var(--text);backgroun
         </div>
       </div>
 
-      <!-- Customers + Reservations row -->
+      <!-- Customers + Gift Cards row -->
       <div class="grid-2">
         <div class="card">
           <div class="card-header">
@@ -11004,38 +11010,128 @@ html,body{height:100%;font-family:'Inter',sans-serif;color:var(--text);backgroun
         </div>
         <div class="card">
           <div class="card-header">
-            <div class="card-title">Upcoming Reservations</div>
-            <button class="btn btn-ghost btn-sm" onclick="switchPanel('reservations',null)">View all →</button>
+            <div class="card-title">Recent Gift Cards</div>
+            <button class="btn btn-ghost btn-sm" onclick="switchPanel('giftcards',null)">View all →</button>
           </div>
-          <div id="ov-reservations-list"></div>
+          <div id="ov-giftcards-list"></div>
         </div>
       </div>
     </div>
 
     <!-- ══════════════════════════════════════
-         PANEL: RESERVATIONS
+         PANEL: GIFT CARDS
     ══════════════════════════════════════ -->
-    <div id="panel-reservations" class="panel">
-      <div class="section-title">Reservations</div>
-      <div class="section-sub">All table bookings from customers</div>
-
-      <div class="card" style="padding:0;overflow:hidden">
-        <div class="table-scroll">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Customer</th>
-              <th>Date</th>
-              <th>Time</th>
-              <th>Guests</th>
-              <th>Status</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody id="reservations-tbody"></tbody>
-        </table>
+    <div id="panel-giftcards" class="panel">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+        <div>
+          <div class="section-title">Gift Cards</div>
+          <div class="section-sub">Manage gift card designs shown to customers</div>
         </div>
+        <button class="btn btn-primary" onclick="openAddGiftCardModal()">+ Add Gift Card</button>
+      </div>
+
+      <!-- Category filter tabs -->
+      <div id="gc-cat-tabs" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px"></div>
+
+      <!-- Gift cards grid -->
+      <div id="gc-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px"></div>
+    </div>
+
+    <!-- ── Add/Edit Gift Card Modal ── -->
+    <div id="gc-modal-overlay" onclick="closeGiftCardModal()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000"></div>
+    <div id="gc-modal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:16px;padding:28px;width:min(480px,94vw);z-index:1001;box-shadow:0 20px 60px rgba(0,0,0,0.2)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+        <div style="font-size:18px;font-weight:700;color:var(--brown)" id="gc-modal-title">Add Gift Card</div>
+        <button onclick="closeGiftCardModal()" style="border:none;background:none;font-size:20px;cursor:pointer;color:var(--muted)">✕</button>
+      </div>
+
+      <!-- Image upload -->
+      <div style="margin-bottom:16px">
+        <label style="font-size:13px;font-weight:600;color:var(--text);display:block;margin-bottom:8px">Card Image *</label>
+        <div id="gc-img-preview" onclick="document.getElementById('gc-img-input').click()" style="width:100%;height:160px;border:2px dashed var(--border);border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;background:var(--beige);position:relative">
+          <div id="gc-img-placeholder" style="text-align:center;color:var(--muted)">
+            <div style="font-size:36px;margin-bottom:8px">🖼️</div>
+            <div style="font-size:13px">Click to upload image</div>
+          </div>
+          <img id="gc-img-tag" src="" alt="" style="display:none;width:100%;height:100%;object-fit:cover;border-radius:10px">
+        </div>
+        <input type="file" id="gc-img-input" accept="image/*" style="display:none" onchange="previewGCImage(this)">
+      </div>
+
+      <div style="margin-bottom:14px">
+        <label style="font-size:13px;font-weight:600;color:var(--text);display:block;margin-bottom:6px">Title *</label>
+        <input type="text" id="gc-title" class="input-field" placeholder="e.g. Happy Birthday to You" style="width:100%">
+      </div>
+
+      <div style="margin-bottom:20px">
+        <label style="font-size:13px;font-weight:600;color:var(--text);display:block;margin-bottom:6px">Category *</label>
+        <input type="text" id="gc-category" class="input-field" list="gc-category-list" placeholder="e.g. Birthday, FIFA, Made with Heart" style="width:100%">
+        <datalist id="gc-category-list"></datalist>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px">Cards with the same category will be grouped together. Existing categories appear as suggestions.</div>
+      </div>
+
+      <div style="display:flex;gap:10px">
+        <button id="gc-save-btn" onclick="saveGiftCard()" class="btn btn-primary" style="flex:1">Save Gift Card</button>
+        <button onclick="closeGiftCardModal()" class="btn btn-ghost" style="flex:1">Cancel</button>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         PANEL: HOME POSTS
+    ══════════════════════════════════════ -->
+    <div id="panel-homeposts" class="panel">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+        <div>
+          <div class="section-title">Home Posts</div>
+          <div class="section-sub">Feed cards shown on the customer app home screen</div>
+        </div>
+        <button class="btn btn-primary" onclick="openAddPostModal()">+ Add Post</button>
+      </div>
+
+      <!-- Posts list -->
+      <div id="hp-list" style="display:flex;flex-direction:column;gap:14px;margin-top:16px"></div>
+    </div>
+
+    <!-- ── Add/Edit Home Post Modal ── -->
+    <div id="hp-modal-overlay" onclick="closePostModal()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000"></div>
+    <div id="hp-modal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:16px;padding:28px;width:min(500px,94vw);z-index:1001;box-shadow:0 20px 60px rgba(0,0,0,0.2);max-height:90vh;overflow-y:auto">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+        <div style="font-size:18px;font-weight:700;color:var(--brown)" id="hp-modal-title">Add Post</div>
+        <button onclick="closePostModal()" style="border:none;background:none;font-size:20px;cursor:pointer;color:var(--muted)">✕</button>
+      </div>
+
+      <!-- Image upload -->
+      <div style="margin-bottom:16px">
+        <label style="font-size:13px;font-weight:600;color:var(--text);display:block;margin-bottom:8px">Banner Image <span style="color:var(--muted);font-weight:400">(optional)</span></label>
+        <div id="hp-img-preview" onclick="document.getElementById('hp-img-input').click()" style="width:100%;height:180px;border:2px dashed var(--border);border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;background:var(--beige);position:relative">
+          <div id="hp-img-placeholder" style="text-align:center;color:var(--muted)">
+            <div style="font-size:36px;margin-bottom:8px">🖼️</div>
+            <div style="font-size:13px">Click to upload banner image</div>
+          </div>
+          <img id="hp-img-tag" src="" alt="" style="display:none;width:100%;height:100%;object-fit:cover">
+        </div>
+        <input type="file" id="hp-img-input" accept="image/*" style="display:none" onchange="previewPostImage(this)">
+      </div>
+
+      <div style="margin-bottom:14px">
+        <label style="font-size:13px;font-weight:600;color:var(--text);display:block;margin-bottom:6px">Title <span style="color:var(--muted);font-weight:400">(optional)</span></label>
+        <input type="text" id="hp-title" class="input-field" placeholder="e.g. World Cup Treats Have Arrived!" style="width:100%">
+      </div>
+
+      <div style="margin-bottom:14px">
+        <label style="font-size:13px;font-weight:600;color:var(--text);display:block;margin-bottom:6px">Body Text <span style="color:var(--muted);font-weight:400">(optional)</span></label>
+        <textarea id="hp-body" class="input-field" rows="3" placeholder="e.g. Three football inspired donuts. One winning line-up." style="width:100%;resize:vertical"></textarea>
+      </div>
+
+      <div style="margin-bottom:20px">
+        <label style="font-size:13px;font-weight:600;color:var(--text);display:block;margin-bottom:6px">Sort Order</label>
+        <input type="number" id="hp-sort" class="input-field" value="0" min="0" style="width:100px">
+        <div style="font-size:11px;color:var(--muted);margin-top:4px">Lower number = appears first in the feed.</div>
+      </div>
+
+      <div style="display:flex;gap:10px">
+        <button id="hp-save-btn" onclick="savePost()" class="btn btn-primary" style="flex:1">Save Post</button>
+        <button onclick="closePostModal()" class="btn btn-ghost" style="flex:1">Cancel</button>
       </div>
     </div>
 
@@ -11079,7 +11175,6 @@ html,body{height:100%;font-family:'Inter',sans-serif;color:var(--text);backgroun
               <th>Category</th>
               <th>Description</th>
               <th>Price</th>
-              <th>Points</th>
               <th style="width:90px">Special</th>
               <th>Actions</th>
             </tr>
@@ -11094,10 +11189,23 @@ html,body{height:100%;font-family:'Inter',sans-serif;color:var(--text);backgroun
          PANEL: REWARDS
     ══════════════════════════════════════ -->
     <div id="panel-rewards" class="panel">
+      <!-- ── Free Coffee Threshold card ── -->
+      <div class="card" style="margin-bottom:24px;border:2px solid var(--gold-light,#F5C842)">
+        <div class="card-title" style="margin-bottom:4px">☕ Free Coffee Threshold</div>
+        <div style="font-size:13px;color:var(--muted);margin-bottom:16px">Set how much a customer must spend (in total DA) to earn a free coffee. This controls the progress bar on their app.</div>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <input class="input-field" type="number" id="free-coffee-da" placeholder="e.g. 5000" min="100" step="100" style="width:180px;margin:0">
+          <span style="font-size:15px;color:var(--muted);font-weight:600">DA</span>
+          <button class="btn btn-gold" onclick="saveFreeCoffeeThreshold()">Save</button>
+          <span id="free-coffee-saved-msg" style="font-size:12px;color:var(--green,#27AE60);display:none">✅ Saved!</span>
+        </div>
+        <div style="margin-top:12px;font-size:12px;color:var(--muted)">Current threshold: <strong id="free-coffee-current">—</strong></div>
+      </div>
+
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">
         <div>
           <div class="section-title">Rewards</div>
-          <div class="section-sub">The star milestones customers see and unlock on "Stars Add Up to Rewards"</div>
+          <div class="section-sub">The spending milestones customers see and unlock on "Stars Add Up to Rewards"</div>
         </div>
         <button class="btn btn-gold" onclick="openAddRewardModal()">+ Add Reward Tier</button>
       </div>
@@ -11109,7 +11217,7 @@ html,body{height:100%;font-family:'Inter',sans-serif;color:var(--text);backgroun
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">
           <div>
             <div class="card-title" style="margin-bottom:4px">Loyalty Tiers</div>
-            <div style="font-size:13px;color:var(--muted)">Set how many points customers need to reach each tier (Bronze, Gold, Platinum, etc.)</div>
+            <div style="font-size:13px;color:var(--muted)">Set how much DA customers need to spend to reach each tier (Bronze, Gold, Platinum, etc.)</div>
           </div>
           <button class="btn btn-gold btn-sm" onclick="openAddTierModal()">+ Add Tier</button>
         </div>
@@ -11122,7 +11230,7 @@ html,body{height:100%;font-family:'Inter',sans-serif;color:var(--text);backgroun
     ══════════════════════════════════════ -->
     <div id="panel-customers" class="panel">
       <div class="section-title">Customers</div>
-      <div class="section-sub">View loyalty members and their points</div>
+      <div class="section-sub">View loyalty members and their total DA spent</div>
 
       <div style="display:flex;gap:12px;margin-bottom:20px">
         <div class="search-wrap" style="flex:1">
@@ -11139,9 +11247,7 @@ html,body{height:100%;font-family:'Inter',sans-serif;color:var(--text);backgroun
               <th>Customer</th>
               <th>Email</th>
               <th>Orders</th>
-              <th>Points</th>
-              <th>Tier</th>
-              <th>Actions</th>
+              <th>DA Spent</th>
             </tr>
           </thead>
           <tbody id="customers-tbody"></tbody>
@@ -11226,7 +11332,7 @@ html,body{height:100%;font-family:'Inter',sans-serif;color:var(--text);backgroun
             </div>
           </div>
           <div class="card">
-            <div class="card-title" style="margin-bottom:14px">Quick Points Add</div>
+            <div class="card-title" style="margin-bottom:14px">Quick Amount Add</div>
             <div class="input-group">
               <label class="input-label">Customer</label>
               <select class="input-field" id="quick-customer">
@@ -11234,10 +11340,10 @@ html,body{height:100%;font-family:'Inter',sans-serif;color:var(--text);backgroun
               </select>
             </div>
             <div class="input-group">
-              <label class="input-label">Points to Add</label>
-              <input class="input-field" type="number" id="quick-pts" placeholder="e.g. 30" min="1" max="999">
+              <label class="input-label">Amount Spent (DA)</label>
+              <input class="input-field" type="number" id="quick-pts" placeholder="e.g. 1500" min="1">
             </div>
-            <button class="btn btn-primary" style="width:100%" onclick="quickAddPoints()">Add Points</button>
+            <button class="btn btn-primary" style="width:100%" onclick="quickAddPoints()">Add Amount</button>
           </div>
         </div>
       </div>
@@ -11248,7 +11354,7 @@ html,body{height:100%;font-family:'Inter',sans-serif;color:var(--text);backgroun
       <div class="card" style="margin-top:24px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
           <div class="card-title">🧾 New Counter Order</div>
-          <span class="status-badge status-new">100 DA = 1 pt</span>
+          <span class="status-badge status-new">DA spent = loyalty progress</span>
         </div>
         <p style="font-size:13px;color:var(--muted);margin-bottom:18px">Select a customer, add items from the menu, then complete the transaction to credit points.</p>
 
@@ -11291,8 +11397,8 @@ html,body{height:100%;font-family:'Inter',sans-serif;color:var(--text);backgroun
                   <span style="font-weight:700;color:var(--brown)" id="co-total-amount">0 DA</span>
                 </div>
                 <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text)">
-                  <span>Points to earn</span>
-                  <span style="font-weight:700;color:var(--gold)" id="co-total-points">0 pts</span>
+                  <span>Loyalty progress</span>
+                  <span style="font-weight:700;color:var(--gold)" id="co-total-points">+0 DA</span>
                 </div>
               </div>
               <button class="btn btn-gold" style="width:100%;margin-top:14px" id="co-complete-btn" onclick="completeCounterOrder()" disabled>Complete Transaction &amp; Add Points</button>
@@ -11354,7 +11460,7 @@ html,body{height:100%;font-family:'Inter',sans-serif;color:var(--text);backgroun
 <div class="modal-overlay" id="modal-add-reward">
   <div class="modal">
     <div class="modal-title" id="reward-modal-title">Add Reward Tier</div>
-    <div class="input-group"><label class="input-label">Points Required</label><input class="input-field" type="number" id="rw-pts" placeholder="e.g. 100"></div>
+    <div class="input-group"><label class="input-label">DA Required (spending threshold)</label><input class="input-field" type="number" id="rw-pts" placeholder="e.g. 5000"></div>
     <div class="input-group"><label class="input-label">Reward Description</label><input class="input-field" id="rw-desc" placeholder="e.g. Free pastry of your choice"></div>
     <div class="input-group"><label class="input-label">Emoji</label><input class="input-field" id="rw-emoji" placeholder="🎁" style="width:80px"></div>
     <div class="modal-footer">
@@ -11369,7 +11475,7 @@ html,body{height:100%;font-family:'Inter',sans-serif;color:var(--text);backgroun
   <div class="modal">
     <div class="modal-title" id="tier-modal-title">Add Loyalty Tier</div>
     <div class="input-group"><label class="input-label">Tier Name</label><input class="input-field" id="tr-name" placeholder="e.g. Gold"></div>
-    <div class="input-group"><label class="input-label">Points Required</label><input class="input-field" type="number" id="tr-pts" placeholder="e.g. 150"></div>
+    <div class="input-group"><label class="input-label">DA Required (spending threshold)</label><input class="input-field" type="number" id="tr-pts" placeholder="e.g. 10000"></div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('modal-add-tier')">Cancel</button>
       <button class="btn btn-primary" id="tier-modal-save-btn">Add Tier</button>
@@ -11403,7 +11509,7 @@ html,body{height:100%;font-family:'Inter',sans-serif;color:var(--text);backgroun
 // ════════════════════════════════════════
 // STATE
 // ════════════════════════════════════════
-let adminData = { bookings:[], customers:[], menuItems:[], milestones:[], tiers:[], supportRequests:[] };
+let adminData = { giftCards:[], homePosts:[], customers:[], menuItems:[], milestones:[], tiers:[], supportRequests:[] };
 let realtimeChannel    = null;
 let currentPanelName   = 'overview';
 
@@ -11420,29 +11526,32 @@ async function initAdmin() {
 // LOAD ALL DATA
 // ════════════════════════════════════════
 async function loadAllData() {
-  const [bRes, cRes, mRes, msRes, trRes, srRes] = await Promise.all([
-    db.from('bookings').select('*, profiles(name,email)').order('created_at',{ascending:false}).limit(100),
+  const [gcRes, hpRes, cRes, mRes, msRes, trRes, srRes] = await Promise.all([
+    db.from('gift_cards').select('*').order('created_at',{ascending:false}),
+    db.from('home_posts').select('*').order('sort_order',{ascending:true}).order('created_at',{ascending:false}),
     db.from('profiles').select('*').order('created_at',{ascending:false}),
     db.from('menu_items').select('*').order('cat').order('name'),
     db.from('milestones').select('*').order('sort_order').order('pts'),
     db.from('loyalty_tiers').select('*').order('sort_order').order('pts_required'),
     db.from('support_requests').select('*').order('created_at',{ascending:false}),
   ]);
-  if (bRes.data)  adminData.bookings   = bRes.data;
+  if (gcRes.data) adminData.giftCards  = gcRes.data;
+  if (hpRes.data) adminData.homePosts  = hpRes.data;
   if (cRes.data)  adminData.customers  = cRes.data;
   if (mRes.data)  adminData.menuItems  = mRes.data;
   if (msRes.data) adminData.milestones = msRes.data;
   if (trRes.data) adminData.tiers      = trRes.data;
   if (srRes.data) adminData.supportRequests = srRes.data;
   if (srRes.error) console.warn('support_requests table not found yet — create it in Supabase to enable the Support panel.');
+  // Note: app_settings table needs: id (uuid), key (text, unique), value (text)
   updateSupportBadge();
 
   // Seed default loyalty tiers if empty (table may not exist yet — fails silently, falls back to defaults in calculateTier)
   if (!adminData.tiers.length && !trRes.error) {
     const sampleTiers = [
-      { name:'Bronze',   pts_required:0,   sort_order:1 },
-      { name:'Gold',     pts_required:150, sort_order:2 },
-      { name:'Platinum', pts_required:400, sort_order:3 },
+      { name:'Bronze',   pts_required:0,     sort_order:1 },
+      { name:'Gold',     pts_required:10000, sort_order:2 },
+      { name:'Platinum', pts_required:20000, sort_order:3 },
     ];
     const { data: seededTiers } = await db.from('loyalty_tiers').insert(sampleTiers).select();
     if (seededTiers) adminData.tiers = seededTiers.sort((a,b) => (a.sort_order||0) - (b.sort_order||0) || a.pts_required - b.pts_required);
@@ -11467,18 +11576,58 @@ async function loadAllData() {
   // Seed default reward milestones if empty
   if (!adminData.milestones.length) {
     const sampleMilestones = [
-      { pts:25,  emoji:'✨', description:'Customize your drink (shot, dairy, syrup)', sort_order:1 },
-      { pts:50,  emoji:'☕', description:'Brewed hot coffee, bakery item or hot tea', sort_order:2 },
-      { pts:150, emoji:'🥤', description:'Handcrafted drink, hot breakfast or parfait', sort_order:3 },
-      { pts:200, emoji:'🥗', description:'Lunch sandwich, protein box or salad', sort_order:4 },
-      { pts:400, emoji:'🎁', description:'Select merchandise or at-home coffee', sort_order:5 },
+      { pts:2500,  emoji:'✨', description:'Customize your drink (shot, dairy, syrup)', sort_order:1 },
+      { pts:5000,  emoji:'☕', description:'Brewed hot coffee, bakery item or hot tea', sort_order:2 },
+      { pts:10000, emoji:'🥤', description:'Handcrafted drink, hot breakfast or parfait', sort_order:3 },
+      { pts:15000, emoji:'🥗', description:'Lunch sandwich, protein box or salad', sort_order:4 },
+      { pts:20000, emoji:'🎁', description:'Select merchandise or at-home coffee', sort_order:5 },
     ];
     const { data: seededMs } = await db.from('milestones').insert(sampleMilestones).select();
     if (seededMs) adminData.milestones = seededMs.sort((a,b) => (a.sort_order||0) - (b.sort_order||0) || a.pts - b.pts);
   }
 
   populateQuickCustomerDropdown();
+  // Load free coffee threshold
+  await loadFreeCoffeeThreshold();
+
   renderCounterMenuGrid();
+}
+
+// ════════════════════════════════════════
+// FREE COFFEE THRESHOLD
+// ════════════════════════════════════════
+async function loadFreeCoffeeThreshold() {
+  try {
+    const { data, error } = await db.from('app_settings')
+      .select('value').eq('key', 'free_coffee_da').single();
+    const val = (!error && data) ? parseInt(data.value) : null;
+    const input   = document.getElementById('free-coffee-da');
+    const current = document.getElementById('free-coffee-current');
+    if (val) {
+      if (input)   input.value = val;
+      if (current) current.textContent = val.toLocaleString() + ' DA';
+      window.FREE_COFFEE_DA = val;
+    } else {
+      if (current) current.textContent = 'Not set (default 5 000 DA)';
+      window.FREE_COFFEE_DA = 5000;
+    }
+  } catch(e) {
+    window.FREE_COFFEE_DA = 5000;
+  }
+}
+
+async function saveFreeCoffeeThreshold() {
+  const val = parseInt(document.getElementById('free-coffee-da').value);
+  if (!val || val < 100) { toast('Enter a valid amount (min 100 DA)'); return; }
+  const { error } = await db.from('app_settings')
+    .upsert({ key: 'free_coffee_da', value: String(val) }, { onConflict: 'key' });
+  if (error) { toast('Error saving: ' + error.message); return; }
+  window.FREE_COFFEE_DA = val;
+  const current = document.getElementById('free-coffee-current');
+  if (current) current.textContent = val.toLocaleString() + ' DA';
+  const msg = document.getElementById('free-coffee-saved-msg');
+  if (msg) { msg.style.display = 'inline'; setTimeout(() => msg.style.display = 'none', 2500); }
+  toast(`✅ Free coffee threshold set to ${val.toLocaleString()} DA`);
 }
 
 // ════════════════════════════════════════
@@ -11487,18 +11636,33 @@ async function loadAllData() {
 function subscribeRealtime() {
   if (realtimeChannel) db.removeChannel(realtimeChannel);
   realtimeChannel = db.channel('admin-live')
-    .on('postgres_changes', { event:'INSERT', schema:'public', table:'bookings' }, async payload => {
-      const { data } = await db.from('bookings').select('*, profiles(name,email)').eq('id', payload.new.id).single();
-      if (data) {
-        adminData.bookings.unshift(data);
-        liveBadge('📅 New reservation!');
-        const name = data.profiles?.name || 'A customer';
-        sendAdminPush('📅 New Reservation', `${name} booked a table for ${data.guests} on ${data.date} at ${data.time}`);
-      }
+    .on('postgres_changes', { event:'INSERT', schema:'public', table:'gift_cards' }, payload => {
+      if (payload.new) adminData.giftCards.unshift(payload.new);
       renderCurrentPanel();
     })
-    .on('postgres_changes', { event:'DELETE', schema:'public', table:'bookings' }, payload => {
-      adminData.bookings = adminData.bookings.filter(b => String(b.id) !== String(payload.old.id));
+    .on('postgres_changes', { event:'UPDATE', schema:'public', table:'gift_cards' }, payload => {
+      const i = adminData.giftCards.findIndex(g => g.id === payload.new.id);
+      if (i !== -1) Object.assign(adminData.giftCards[i], payload.new);
+      renderCurrentPanel();
+    })
+    .on('postgres_changes', { event:'DELETE', schema:'public', table:'gift_cards' }, payload => {
+      adminData.giftCards = adminData.giftCards.filter(g => g.id !== payload.old.id);
+      renderCurrentPanel();
+    })
+    // ── Home Posts realtime ──
+    .on('postgres_changes', { event:'INSERT', schema:'public', table:'home_posts' }, payload => {
+      if (payload.new) adminData.homePosts.unshift(payload.new);
+      adminData.homePosts.sort((a,b)=>(a.sort_order||0)-(b.sort_order||0));
+      renderCurrentPanel();
+    })
+    .on('postgres_changes', { event:'UPDATE', schema:'public', table:'home_posts' }, payload => {
+      const i = adminData.homePosts.findIndex(p => p.id === payload.new.id);
+      if (i !== -1) Object.assign(adminData.homePosts[i], payload.new);
+      adminData.homePosts.sort((a,b)=>(a.sort_order||0)-(b.sort_order||0));
+      renderCurrentPanel();
+    })
+    .on('postgres_changes', { event:'DELETE', schema:'public', table:'home_posts' }, payload => {
+      adminData.homePosts = adminData.homePosts.filter(p => p.id !== payload.old.id);
       renderCurrentPanel();
     })
     .on('postgres_changes', { event:'INSERT', schema:'public', table:'support_requests' }, payload => {
@@ -11521,7 +11685,6 @@ function subscribeRealtime() {
     })
     .on('postgres_changes', { event:'DELETE', schema:'public', table:'profiles' }, payload => {
       adminData.customers = adminData.customers.filter(c => c.id !== payload.old.id);
-      adminData.bookings  = adminData.bookings.filter(b => b.customer_id !== payload.old.id);
       populateQuickCustomerDropdown();
       renderCurrentPanel();
     })
@@ -11566,14 +11729,15 @@ function toggleMoreMenu() {
 // NAVIGATION
 // ════════════════════════════════════════
 const panelTitles = {
-  overview:'Overview', reservations:'Reservations',
+  overview:'Overview', giftcards:'Gift Cards', homeposts:'Home Posts',
   menu:'Menu Items', rewards:'Rewards', customers:'Customers', scanner:'QR Scanner', support:'Support'
 };
 const panelSubs = {
   overview:"Here's what's happening today",
-  reservations:'Table bookings from customers',
+  giftcards:'Manage gift card designs shown to customers',
+  homeposts:'Feed cards shown on the customer app home screen',
   menu:'Manage your full menu catalogue',
-  rewards:'Manage the rewards customers unlock with points',
+  rewards:'Manage the rewards customers unlock based on DA spent',
   customers:'Registered loyalty members',
   scanner:'Scan customer QR to add points',
   support:'Problem reports submitted by customers'
@@ -11605,7 +11769,8 @@ function switchPanel(name, clickedEl) {
 
 function renderCurrentPanel() {
   if (currentPanelName === 'overview')     renderOverview();
-  if (currentPanelName === 'reservations') renderReservationsTable();
+  if (currentPanelName === 'giftcards')    renderGiftCardsPanel();
+  if (currentPanelName === 'homeposts')    renderHomePostsPanel();
   if (currentPanelName === 'customers')    renderCustomersTable();
   if (currentPanelName === 'menu')         renderMenuTable();
   if (currentPanelName === 'rewards')      { renderRewardsTable(); renderTiersTable(); }
@@ -11616,17 +11781,10 @@ function renderCurrentPanel() {
 // OVERVIEW
 // ════════════════════════════════════════
 function renderOverview() {
-  const todayStr = (() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-  })();
-  const upcoming     = adminData.bookings.filter(b => b.status !== 'Cancelled').length;
-  const todayBookings = adminData.bookings.filter(b => b.date === todayStr && b.status !== 'Cancelled').length;
-
-  set('ov-customers',          adminData.customers.length);
-  set('ov-reservations',       upcoming);
-  set('ov-reservations-today', todayBookings);
-  set('ov-menu-count',         adminData.menuItems.length);
+  set('ov-customers',      adminData.customers.length);
+  set('ov-giftcards',      adminData.giftCards.length);
+  set('ov-giftcard-cats',  [...new Set(adminData.giftCards.map(g => g.category).filter(Boolean))].length);
+  set('ov-menu-count',     adminData.menuItems.length);
 
   // Recent customers
   const custEl = document.getElementById('ov-customers-list');
@@ -11639,121 +11797,397 @@ function renderOverview() {
       </div>`).join('') || '<div style="padding:24px;text-align:center;color:var(--muted)">No customers yet</div>';
   }
 
-  // Upcoming reservations
-  const resEl = document.getElementById('ov-reservations-list');
-  if (resEl) {
-    const upcomingList = adminData.bookings.filter(b => b.status !== 'Cancelled').slice(0,4);
-    resEl.innerHTML = upcomingList.length ? upcomingList.map(b => `
+  // Recent gift cards
+  const gcEl = document.getElementById('ov-giftcards-list');
+  if (gcEl) {
+    const recent = adminData.giftCards.slice(0,4);
+    gcEl.innerHTML = recent.length ? recent.map(g => `
       <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
-        <div style="font-size:20px">📅</div>
+        ${g.image_url ? `<img src="${g.image_url}" alt="" style="width:48px;height:34px;border-radius:6px;object-fit:cover;flex-shrink:0">` : `<div style="width:48px;height:34px;border-radius:6px;background:linear-gradient(135deg,var(--brown),var(--gold));flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:18px">🎁</div>`}
         <div style="flex:1">
-          <div style="font-size:13px;font-weight:500">${b.profiles?.name||'Guest'} · ${b.guests} guests</div>
-          <div style="font-size:11px;color:var(--muted)">${b.date} at ${b.time}</div>
+          <div style="font-size:13px;font-weight:500">${g.title||'Untitled'}</div>
+          <div style="font-size:11px;color:var(--muted)">${g.category||'—'}</div>
         </div>
-        <span class="status-badge status-${b.status}">${b.status}</span>
       </div>`).join('')
-      : '<div style="padding:24px;text-align:center;color:var(--muted)">No upcoming reservations</div>';
+      : '<div style="padding:24px;text-align:center;color:var(--muted)">No gift cards yet</div>';
   }
 }
 
 // ════════════════════════════════════════
-// RESERVATIONS TABLE
+// GIFT CARDS
 // ════════════════════════════════════════
-function renderReservationsTable() {
-  const tbody = document.getElementById('reservations-tbody');
-  if (!tbody) return;
-  if (!adminData.bookings.length) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--muted)">No bookings yet</td></tr>';
+let gcEditingId = null;
+let gcImageFile = null;
+
+function renderGiftCardsPanel() {
+  const cards = adminData.giftCards;
+  const categories = [...new Set(cards.map(g => g.category).filter(Boolean))];
+
+  // Category filter tabs
+  const tabsEl = document.getElementById('gc-cat-tabs');
+  if (tabsEl) {
+    const all = gcActiveCat || 'all';
+    tabsEl.innerHTML = `
+      <button onclick="filterGCCat('all')" style="padding:6px 14px;border-radius:20px;border:1.5px solid ${all==='all'?'var(--brown)':'var(--border)'};background:${all==='all'?'var(--brown)':'transparent'};color:${all==='all'?'white':'var(--text)'};font-size:12px;font-weight:600;cursor:pointer">All</button>
+      ${categories.map(cat => `
+        <button onclick="filterGCCat('${cat}')" style="padding:6px 14px;border-radius:20px;border:1.5px solid ${all===cat?'var(--brown)':'var(--border)'};background:${all===cat?'var(--brown)':'transparent'};color:${all===cat?'white':'var(--text)'};font-size:12px;font-weight:600;cursor:pointer">${cat}</button>
+      `).join('')}
+    `;
+  }
+
+  // Grid
+  const grid = document.getElementById('gc-grid');
+  if (!grid) return;
+  const filtered = gcActiveCat && gcActiveCat !== 'all' ? cards.filter(g => g.category === gcActiveCat) : cards;
+
+  if (!filtered.length) {
+    grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--muted)">
+      <div style="font-size:48px;margin-bottom:12px">🎁</div>
+      <div style="font-size:15px;font-weight:500;margin-bottom:6px">No gift cards yet</div>
+      <div style="font-size:13px">Click "+ Add Gift Card" to upload your first design</div>
+    </div>`;
     return;
   }
-  tbody.innerHTML = adminData.bookings.map(b => `
-    <tr>
-      <td><span style="font-size:11px;font-weight:700;color:var(--brown)">#${String(b.id).substring(0,8)}</span></td>
-      <td>
-        <div style="font-size:13px;font-weight:500">${b.profiles?.name||'Guest'}</div>
-        <div style="font-size:11px;color:var(--muted)">${b.profiles?.email||''}</div>
-      </td>
-      <td style="font-weight:500">${b.date||'—'}</td>
-      <td>${b.time||'—'}</td>
-      <td style="text-align:center">
-        <div style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;background:var(--beige);border-radius:50%;font-weight:700;font-size:12px">${b.guests}</div>
-      </td>
-      <td><span class="status-badge status-${b.status}">${b.status}</span></td>
-      <td>
-        <div style="display:flex;gap:6px;align-items:center">
-          ${b.status==='Pending'?`
-            <button onclick="updateBooking('${b.id}','Confirmed')" style="border:none;background:var(--success);color:white;border-radius:6px;padding:5px 10px;font-size:11px;cursor:pointer;font-weight:600">✓ Confirm</button>
-            <button onclick="updateBooking('${b.id}','Cancelled')" style="border:none;background:var(--error);color:white;border-radius:6px;padding:5px 8px;font-size:11px;cursor:pointer;font-weight:600">✗</button>`
-          : b.status==='Confirmed'
-          ? `<button onclick="updateBooking('${b.id}','Cancelled')" style="border:none;background:#FDEAEA;color:var(--error);border-radius:6px;padding:5px 10px;font-size:11px;cursor:pointer;font-weight:600">Cancel</button>`
-          : `<span style="font-size:11px;color:var(--muted)">—</span>`}
-          <button onclick="deleteBooking('${b.id}')" title="Delete reservation" style="border:none;background:#FDEAEA;color:var(--error);border-radius:6px;padding:5px 8px;font-size:12px;cursor:pointer;font-weight:600">🗑️</button>
+
+  grid.innerHTML = filtered.map(g => `
+    <div style="background:#fff;border-radius:14px;border:1px solid var(--border);overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
+      <div style="position:relative;height:130px;background:linear-gradient(135deg,var(--brown),var(--gold));overflow:hidden">
+        ${g.image_url ? `<img src="${g.image_url}" alt="${g.title}" style="width:100%;height:100%;object-fit:cover">` : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:48px">🎁</div>`}
+        <div style="position:absolute;top:8px;right:8px;display:flex;gap:4px">
+          <button onclick="openEditGiftCard('${g.id}')" style="background:rgba(255,255,255,0.9);border:none;border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;font-weight:600">✏️</button>
+          <button onclick="deleteGiftCard('${g.id}')" style="background:rgba(255,255,255,0.9);border:none;border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;font-weight:600;color:var(--error)">🗑️</button>
         </div>
-      </td>
-    </tr>`).join('');
+      </div>
+      <div style="padding:10px 12px">
+        <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${g.title||'Untitled'}</div>
+        <div style="display:inline-block;background:var(--beige);color:var(--brown);font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px">${g.category||'—'}</div>
+      </div>
+    </div>
+  `).join('');
 }
 
-async function updateBooking(id, status) {
-  const { error } = await db.from('bookings').update({ status }).eq('id', id);
-  if (error) { toast('Error: ' + error.message); return; }
-  const b = adminData.bookings.find(b => String(b.id) === String(id));
-  if (b) b.status = status;
+let gcActiveCat = 'all';
+function filterGCCat(cat) {
+  gcActiveCat = cat;
+  renderGiftCardsPanel();
+}
 
-  // ── Send in-app notification to the customer ──
-  if (b && b.customer_id) {
-    const isConfirmed = status === 'Confirmed';
-    const icon  = isConfirmed ? '✅' : '❌';
-    const title = isConfirmed ? 'Reservation Confirmed!' : 'Reservation Cancelled';
-    const body  = isConfirmed
-      ? `Your table for ${b.guests} on ${b.date} at ${b.time} is confirmed. See you soon! ☕`
-      : `Your reservation on ${b.date} at ${b.time} has been cancelled. Please contact us for more info.`;
+function populateGCCategoryList() {
+  const dl = document.getElementById('gc-category-list');
+  if (!dl) return;
+  const cats = [...new Set(adminData.giftCards.map(g => g.category).filter(Boolean))].sort();
+  dl.innerHTML = cats.map(c => `<option value="${c}">`).join('');
+}
 
-    // Insert into notifications table (customer app reads this via Realtime)
-    await db.from('notifications').insert({
-      customer_id: b.customer_id,
-      icon,
-      title,
-      body,
-    });
+function openAddGiftCardModal() {
+  gcEditingId = null;
+  gcImageFile = null;
+  document.getElementById('gc-modal-title').textContent = 'Add Gift Card';
+  document.getElementById('gc-title').value = '';
+  document.getElementById('gc-category').value = '';
+  document.getElementById('gc-img-tag').style.display = 'none';
+  document.getElementById('gc-img-tag').src = '';
+  document.getElementById('gc-img-placeholder').style.display = 'flex';
+  document.getElementById('gc-img-input').value = '';
+  populateGCCategoryList();
+  document.getElementById('gc-modal').style.display = 'block';
+  document.getElementById('gc-modal-overlay').style.display = 'block';
+}
 
-    // Also trigger push notification via Edge Function
-    try {
-      const { data: { session } } = await db.auth.getSession();
-      const token = session?.access_token;
-      await fetch(`${SUPABASE_URL}/functions/v1/send-push`, {
-        method: 'POST',
-        headers: {
-          'Content-Type':  'application/json',
-          'Authorization': `Bearer ${token || SUPABASE_KEY}`,
-        },
-        body: JSON.stringify({ title, body, icon, customer_id: b.customer_id }),
-      });
-    } catch (e) {
-      console.warn('[HEYCAT] Push notification failed:', e);
-    }
+function openEditGiftCard(id) {
+  const g = adminData.giftCards.find(x => x.id === id);
+  if (!g) return;
+  gcEditingId = id;
+  gcImageFile = null;
+  document.getElementById('gc-modal-title').textContent = 'Edit Gift Card';
+  document.getElementById('gc-title').value = g.title || '';
+  document.getElementById('gc-category').value = g.category || '';
+  if (g.image_url) {
+    document.getElementById('gc-img-tag').src = g.image_url;
+    document.getElementById('gc-img-tag').style.display = 'block';
+    document.getElementById('gc-img-placeholder').style.display = 'none';
+  } else {
+    document.getElementById('gc-img-tag').style.display = 'none';
+    document.getElementById('gc-img-placeholder').style.display = 'flex';
+  }
+  populateGCCategoryList();
+  document.getElementById('gc-modal').style.display = 'block';
+  document.getElementById('gc-modal-overlay').style.display = 'block';
+}
+
+function closeGiftCardModal() {
+  document.getElementById('gc-modal').style.display = 'none';
+  document.getElementById('gc-modal-overlay').style.display = 'none';
+}
+
+function previewGCImage(input) {
+  if (!input.files || !input.files[0]) return;
+  gcImageFile = input.files[0];
+  const url = URL.createObjectURL(gcImageFile);
+  document.getElementById('gc-img-tag').src = url;
+  document.getElementById('gc-img-tag').style.display = 'block';
+  document.getElementById('gc-img-placeholder').style.display = 'none';
+}
+
+async function saveGiftCard() {
+  const title    = document.getElementById('gc-title').value.trim();
+  const category = document.getElementById('gc-category').value.trim();
+  if (!title)    { toast('Please enter a title'); return; }
+  if (!category) { toast('Please enter a category'); return; }
+
+  const btn = document.getElementById('gc-save-btn');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+
+  let image_url = null;
+  // If editing, keep existing image unless a new one was chosen
+  if (gcEditingId) {
+    const existing = adminData.giftCards.find(g => g.id === gcEditingId);
+    image_url = existing?.image_url || null;
   }
 
-  renderReservationsTable();
-  if (currentPanelName === 'overview') renderOverview();
-  toast('✅ Reservation ' + status.toLowerCase());
+  // Upload new image if selected
+  if (gcImageFile) {
+    const ext  = gcImageFile.name.split('.').pop();
+    const path = `gift-cards/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    const { error: upErr } = await db.storage.from('menu-images').upload(path, gcImageFile, { upsert: true });
+    if (upErr) {
+      toast('❌ Image upload failed: ' + upErr.message);
+      btn.disabled = false; btn.textContent = 'Save Gift Card'; return;
+    }
+    const { data: { publicUrl } } = db.storage.from('menu-images').getPublicUrl(path);
+    image_url = publicUrl;
+  }
+
+  if (!image_url && !gcEditingId) { toast('Please upload an image'); btn.disabled = false; btn.textContent = 'Save Gift Card'; return; }
+
+  let error;
+  if (gcEditingId) {
+    ({ error } = await db.from('gift_cards').update({ title, category, image_url }).eq('id', gcEditingId));
+    if (!error) {
+      const idx = adminData.giftCards.findIndex(g => g.id === gcEditingId);
+      if (idx !== -1) Object.assign(adminData.giftCards[idx], { title, category, image_url });
+    }
+  } else {
+    const { data, error: e } = await db.from('gift_cards').insert({ title, category, image_url }).select().single();
+    error = e;
+    if (!error && data) adminData.giftCards.unshift(data);
+  }
+
+  btn.disabled = false; btn.textContent = 'Save Gift Card';
+  if (error) { toast('❌ ' + error.message); return; }
+  closeGiftCardModal();
+  renderGiftCardsPanel();
+  renderOverview();
+  toast(gcEditingId ? '✅ Gift card updated' : '✅ Gift card added');
 }
 
-async function deleteBooking(id) {
-  if (!confirm('Delete this reservation permanently? This cannot be undone.')) return;
-  const { error } = await db.from('bookings').delete().eq('id', id);
-  if (error) { toast('❌ Error: ' + error.message); return; }
+async function deleteGiftCard(id) {
+  if (!confirm('Delete this gift card permanently?')) return;
+  const { error } = await db.from('gift_cards').delete().eq('id', id);
+  if (error) { toast('❌ ' + error.message); return; }
+  adminData.giftCards = adminData.giftCards.filter(g => g.id !== id);
+  renderGiftCardsPanel();
+  renderOverview();
+  toast('🗑️ Gift card deleted');
+}
 
-  // Verify the row is actually gone (catches silent RLS failures)
-  const { data: check } = await db.from('bookings').select('id').eq('id', id).maybeSingle();
-  if (check) {
-    toast('❌ Delete failed — check your Supabase RLS policies for the bookings table.');
+// ════════════════════════════════════════
+// HOME POSTS
+// ════════════════════════════════════════
+let hpEditingId = null;
+let hpImageFile = null;
+
+function renderHomePostsPanel() {
+  const list = document.getElementById('hp-list');
+  if (!list) return;
+  const posts = adminData.homePosts;
+
+  if (!posts.length) {
+    list.innerHTML = `<div style="text-align:center;padding:60px 20px;color:var(--muted)">
+      <div style="font-size:48px;margin-bottom:12px">📰</div>
+      <div style="font-size:15px;font-weight:500;margin-bottom:6px">No posts yet</div>
+      <div style="font-size:13px">Click "+ Add Post" to add the first home feed card</div>
+    </div>`;
     return;
   }
 
-  adminData.bookings = adminData.bookings.filter(b => String(b.id) !== String(id));
-  renderReservationsTable();
-  if (currentPanelName === 'overview') renderOverview();
-  toast('🗑️ Reservation deleted');
+  list.innerHTML = posts.map(p => `
+    <div style="background:#fff;border-radius:14px;border:1px solid var(--border);overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.05);display:flex;align-items:stretch">
+      <!-- Image thumb -->
+      <div style="width:110px;flex-shrink:0;background:linear-gradient(135deg,var(--brown),var(--gold));overflow:hidden">
+        ${p.image_url
+          ? `<img src="${p.image_url}" alt="" style="width:100%;height:100%;object-fit:cover">`
+          : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:36px;min-height:90px">☕</div>`}
+      </div>
+      <!-- Content -->
+      <div style="flex:1;padding:14px 16px;min-width:0">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+          <div style="min-width:0">
+            ${p.title ? `<div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.title}</div>` : ''}
+            ${p.body  ? `<div style="font-size:12px;color:var(--muted);line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${p.body}</div>` : ''}
+          </div>
+          <div style="display:flex;gap:6px;flex-shrink:0">
+            <button onclick="openEditPost('${p.id}')" style="background:var(--beige);border:none;border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;font-weight:600;color:var(--brown)">✏️ Edit</button>
+            <button onclick="deletePost('${p.id}')" style="background:#FEE2E2;border:none;border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;font-weight:600;color:var(--error)">🗑️</button>
+          </div>
+        </div>
+        <div style="margin-top:8px">
+          <span style="font-size:10px;font-weight:700;background:var(--beige);color:var(--brown);padding:2px 8px;border-radius:10px">Order: ${p.sort_order ?? 0}</span>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function openAddPostModal() {
+  hpEditingId = null;
+  hpImageFile = null;
+  document.getElementById('hp-modal-title').textContent = 'Add Post';
+  document.getElementById('hp-title').value = '';
+  document.getElementById('hp-body').value  = '';
+  document.getElementById('hp-sort').value  = adminData.homePosts.length;
+  document.getElementById('hp-img-tag').style.display = 'none';
+  document.getElementById('hp-img-tag').src = '';
+  document.getElementById('hp-img-placeholder').style.display = 'flex';
+  document.getElementById('hp-img-input').value = '';
+  document.getElementById('hp-modal').style.display = 'block';
+  document.getElementById('hp-modal-overlay').style.display = 'block';
+}
+
+function openEditPost(id) {
+  const p = adminData.homePosts.find(x => x.id === id);
+  if (!p) return;
+  hpEditingId = id;
+  hpImageFile = null;
+  document.getElementById('hp-modal-title').textContent = 'Edit Post';
+  document.getElementById('hp-title').value = p.title || '';
+  document.getElementById('hp-body').value  = p.body  || '';
+  document.getElementById('hp-sort').value  = p.sort_order ?? 0;
+  if (p.image_url) {
+    document.getElementById('hp-img-tag').src = p.image_url;
+    document.getElementById('hp-img-tag').style.display = 'block';
+    document.getElementById('hp-img-placeholder').style.display = 'none';
+  } else {
+    document.getElementById('hp-img-tag').style.display = 'none';
+    document.getElementById('hp-img-placeholder').style.display = 'flex';
+  }
+  document.getElementById('hp-img-input').value = '';
+  document.getElementById('hp-modal').style.display = 'block';
+  document.getElementById('hp-modal-overlay').style.display = 'block';
+}
+
+function closePostModal() {
+  document.getElementById('hp-modal').style.display = 'none';
+  document.getElementById('hp-modal-overlay').style.display = 'none';
+}
+
+function previewPostImage(input) {
+  if (!input.files || !input.files[0]) return;
+  hpImageFile = input.files[0];
+  const url = URL.createObjectURL(hpImageFile);
+  document.getElementById('hp-img-tag').src = url;
+  document.getElementById('hp-img-tag').style.display = 'block';
+  document.getElementById('hp-img-placeholder').style.display = 'none';
+}
+
+async function savePost() {
+  const title      = document.getElementById('hp-title').value.trim();
+  const body       = document.getElementById('hp-body').value.trim();
+  const sort_order = parseInt(document.getElementById('hp-sort').value) || 0;
+
+  if (!title && !body && !hpImageFile && !hpEditingId) {
+    toast('Please add at least an image, title, or body text'); return;
+  }
+
+  const btn = document.getElementById('hp-save-btn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+
+  // Keep existing image when editing unless a new one is chosen
+  let image_url = hpEditingId ? (adminData.homePosts.find(p => p.id === hpEditingId)?.image_url || null) : null;
+
+  if (hpImageFile) {
+    const ext  = hpImageFile.name.split('.').pop();
+    const path = `home-posts/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    const { error: upErr } = await db.storage.from('menu-images').upload(path, hpImageFile, { upsert: true });
+    if (upErr) {
+      toast('❌ Image upload failed: ' + upErr.message);
+      btn.disabled = false; btn.textContent = 'Save Post'; return;
+    }
+    const { data: { publicUrl } } = db.storage.from('menu-images').getPublicUrl(path);
+    image_url = publicUrl;
+  }
+
+  const payload = { title: title || null, body: body || null, image_url, sort_order };
+  let error;
+  const isNewPost = !hpEditingId;
+
+  if (hpEditingId) {
+    ({ error } = await db.from('home_posts').update(payload).eq('id', hpEditingId));
+    if (!error) {
+      const i = adminData.homePosts.findIndex(p => p.id === hpEditingId);
+      if (i !== -1) Object.assign(adminData.homePosts[i], payload);
+    }
+  } else {
+    const { data, error: e } = await db.from('home_posts').insert(payload).select().single();
+    error = e;
+    if (!error && data) adminData.homePosts.unshift(data);
+  }
+
+  adminData.homePosts.sort((a,b) => (a.sort_order||0) - (b.sort_order||0));
+  btn.disabled = false; btn.textContent = 'Save Post';
+  if (error) { toast('❌ ' + error.message); return; }
+  closePostModal();
+  renderHomePostsPanel();
+  toast(hpEditingId ? '✅ Post updated' : '✅ Post added');
+
+  // Notify all customers when a brand-new news feed post goes live —
+  // editing an existing post does not re-notify.
+  if (isNewPost && (title || body)) {
+    notifyAllOfNewPost(title, body);
+  }
+}
+
+/** Broadcasts a "new news feed post" alert: in-app bell notification + real Web Push, to every customer. */
+async function notifyAllOfNewPost(title, body) {
+  const pushTitle = title ? title : 'HEY CAT';
+  const pushBody  = body  ? body  : 'Check out what\'s new at HEY CAT! 🐾';
+
+  // 1. Write to notifications table (in-app bell) — broadcast to all (customer_id: null)
+  try {
+    await db.from('notifications').insert({ customer_id: null, icon: '📰', title: pushTitle, body: pushBody });
+  } catch (e) {
+    console.warn('[HEYCAT ADMIN] In-app notification insert failed:', e);
+  }
+
+  // 2. Trigger real push notifications via Supabase Edge Function (no customer_id = send to all)
+  try {
+    const { data: { session } } = await db.auth.getSession();
+    const token = session?.access_token;
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/send-push`, {
+      method: 'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'Authorization': `Bearer ${token || SUPABASE_KEY}`,
+      },
+      body: JSON.stringify({ title: pushTitle, body: pushBody, icon: '📰', url: '/' }),
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      console.warn('[HEYCAT ADMIN] Push function error:', err);
+    }
+  } catch (e) {
+    console.warn('[HEYCAT ADMIN] Could not reach push function:', e);
+  }
+}
+
+async function deletePost(id) {
+  if (!confirm('Delete this post permanently?')) return;
+  const { error } = await db.from('home_posts').delete().eq('id', id);
+  if (error) { toast('❌ ' + error.message); return; }
+  adminData.homePosts = adminData.homePosts.filter(p => p.id !== id);
+  renderHomePostsPanel();
+  toast('🗑️ Post deleted');
 }
 
 // ════════════════════════════════════════
@@ -11782,7 +12216,6 @@ function renderMenuTable() {
       <td><span class="status-badge status-new" style="text-transform:capitalize">${item.cat}</span></td>
       <td style="font-size:12px;color:var(--muted);max-width:180px">${(item.description||'').substring(0,60)}${(item.description||'').length>60?'…':''}</td>
       <td style="font-weight:700;color:var(--brown)">${(item.price||0).toLocaleString()} DA</td>
-      <td style="color:var(--gold);font-weight:600">+${item.pts} pts</td>
       <td style="text-align:center">
         <button onclick="toggleMenuItemSpecial(${item.id})" title="${item.is_special ? 'Remove as Today\u2019s Special' : 'Set as Today\u2019s Special (hero banner)'}" style="border:none;background:none;cursor:pointer;font-size:20px;line-height:1;padding:4px">${item.is_special ? '⭐' : '☆'}</button>
       </td>
@@ -12015,7 +12448,7 @@ function renderRewardsTable() {
         <button class="reward-order-btn" onclick="moveRewardTier(${m.id},'down')" ${i===items.length-1?'disabled':''} title="Move down">▼</button>
       </div>
       <div class="reward-card-emoji">${m.emoji || '🎁'}</div>
-      <div class="reward-card-pts">⭐ ${m.pts} pts</div>
+      <div class="reward-card-pts">💰 ${m.pts.toLocaleString()} DA</div>
       <div class="reward-card-desc">${m.description || ''}</div>
       <div class="reward-card-actions">
         <button onclick="editRewardTier(${m.id})" style="border:1.5px solid var(--brown);background:transparent;color:var(--brown);border-radius:6px;padding:6px 12px;font-size:11px;cursor:pointer;font-weight:600">Edit</button>
@@ -12039,7 +12472,7 @@ async function addRewardTier() {
   const pts   = parseInt(document.getElementById('rw-pts').value);
   const desc  = document.getElementById('rw-desc').value.trim();
   const emoji = document.getElementById('rw-emoji').value.trim() || '🎁';
-  if (!pts || !desc) { toast('Points and description are required'); return; }
+  if (!pts || !desc) { toast('DA threshold and description are required'); return; }
   const nextOrder = adminData.milestones.length
     ? Math.max(...adminData.milestones.map(m => m.sort_order || 0)) + 1
     : 1;
@@ -12068,7 +12501,7 @@ async function saveEditRewardTier(id) {
   const pts   = parseInt(document.getElementById('rw-pts').value);
   const desc  = document.getElementById('rw-desc').value.trim();
   const emoji = document.getElementById('rw-emoji').value.trim() || '🎁';
-  if (!pts || !desc) { toast('Points and description are required'); return; }
+  if (!pts || !desc) { toast('DA threshold and description are required'); return; }
   const { error } = await db.from('milestones').update({ pts, description: desc, emoji }).eq('id', id);
   if (error) { toast('Error: ' + error.message); return; }
   const m = adminData.milestones.find(m => m.id === id);
@@ -12120,7 +12553,7 @@ function calculateTier(points) {
     const match = sorted.find(t => points >= (t.pts_required||0));
     if (match) return match.name;
   }
-  return points >= 400 ? 'Platinum' : points >= 150 ? 'Gold' : 'Bronze';
+  return points >= 20000 ? 'Platinum' : points >= 10000 ? 'Gold' : 'Bronze';
 }
 
 function renderTiersTable() {
@@ -12138,7 +12571,7 @@ function renderTiersTable() {
         <button class="reward-order-btn" onclick="moveLoyaltyTier(${t.id},'down')" ${i===items.length-1?'disabled':''} title="Move down">▼</button>
       </div>
       <div class="reward-card-emoji">🏅</div>
-      <div class="reward-card-pts">${(t.pts_required||0).toLocaleString()} pts</div>
+      <div class="reward-card-pts">${(t.pts_required||0).toLocaleString()} DA</div>
       <div class="reward-card-desc"><strong>${t.name}</strong></div>
       <div class="reward-card-actions">
         <button onclick="editLoyaltyTier(${t.id})" style="border:1.5px solid var(--brown);background:transparent;color:var(--brown);border-radius:6px;padding:6px 12px;font-size:11px;cursor:pointer;font-weight:600">Edit</button>
@@ -12284,11 +12717,11 @@ function filterCustomers(q) {
       </td>
       <td style="font-size:12px;color:var(--muted)">${c.email || ''}</td>
       <td style="text-align:center;font-weight:600">${c.orders_count||0}</td>
-      <td style="font-weight:700;color:var(--brown)">${(c.points||0).toLocaleString()}</td>
+      <td style="font-weight:700;color:var(--brown)">${(c.points||0).toLocaleString()} DA</td>
       <td><span class="status-badge status-${c.tier||'Bronze'}">${c.tier||'Bronze'}</span></td>
       <td>
         <div style="display:flex;gap:6px">
-          <button onclick="addBonusPoints('${c.id}','${(c.name||'').replace(/'/g,"\\'")}')" style="border:1.5px solid var(--brown);background:transparent;color:var(--brown);border-radius:6px;padding:5px 10px;font-size:11px;cursor:pointer;font-weight:600">+ Points</button>
+          <button onclick="addBonusPoints('${c.id}','${(c.name||'').replace(/'/g,"\\'")}')" style="border:1.5px solid var(--brown);background:transparent;color:var(--brown);border-radius:6px;padding:5px 10px;font-size:11px;cursor:pointer;font-weight:600">+ Amount</button>
           <button onclick="deleteCustomer('${c.id}','${(c.name||'').replace(/'/g,"\\'")}')" style="border:none;background:#FEE2E2;color:var(--error);border-radius:6px;padding:5px 10px;font-size:11px;cursor:pointer;font-weight:600">Remove</button>
         </div>
       </td>
@@ -12296,13 +12729,12 @@ function filterCustomers(q) {
 }
 
 async function deleteCustomer(id, name) {
-  if (!confirm(`Remove "${name}" permanently?\n\nThis will delete their profile, points history, bookings, and notifications. They will no longer appear anywhere in the dashboard. This cannot be undone.`)) return;
+  if (!confirm(`Remove "${name}" permanently?\n\nThis will delete their profile, points history, and notifications. They will no longer appear anywhere in the dashboard. This cannot be undone.`)) return;
 
   // Delete all related data first
   const relatedResults = await Promise.all([
     db.from('points_history').delete().eq('customer_id', id),
     db.from('notifications').delete().eq('customer_id', id),
-    db.from('bookings').delete().eq('customer_id', id),
     db.from('push_subscriptions').delete().eq('customer_id', id),
   ]);
   const relatedError = relatedResults.find(r => r.error);
@@ -12318,14 +12750,12 @@ async function deleteCustomer(id, name) {
     return;
   }
 
-  // Remove from all in-memory lists
+  // Remove from in-memory list
   adminData.customers = adminData.customers.filter(c => c.id !== id);
-  adminData.bookings  = adminData.bookings.filter(b => b.customer_id !== id);
 
   // Refresh every panel that shows customer data
   filterCustomers(document.querySelector('#panel-customers .search-wrap input')?.value || '');
   populateQuickCustomerDropdown();
-  renderReservationsTable();
   if (currentPanelName === 'overview') renderOverview();
   toast('🗑 ' + name + ' removed');
 }
@@ -12607,8 +13037,8 @@ function showScanResultFor(c) {
       <div style="font-size:16px;font-weight:700;color:var(--brown);margin-bottom:6px">${c.name}</div>
       <div style="font-size:12px;color:var(--muted);margin-bottom:12px">${c.email}</div>
       <div style="background:var(--beige);border-radius:8px;padding:12px;margin-bottom:14px">
-        <div style="font-size:11px;color:var(--muted)">Current Points</div>
-        <div style="font-size:24px;font-weight:700;color:var(--gold)">${(c.points||0).toLocaleString()}</div>
+        <div style="font-size:11px;color:var(--muted)">Total Spent (DA)</div>
+        <div style="font-size:24px;font-weight:700;color:var(--gold)">${(c.points||0).toLocaleString()} DA</div>
         <div style="font-size:11px;color:var(--muted)">Tier: ${c.tier||'Bronze'}</div>
       </div>
       <div style="text-align:left;margin-bottom:10px">
@@ -12616,8 +13046,8 @@ function showScanResultFor(c) {
         <div class="co-menu-grid" id="scan-menu-grid" style="max-height:300px"></div>
       </div>
       <div style="display:flex;align-items:center;justify-content:space-between;background:var(--beige);border-radius:8px;padding:10px 14px;margin-bottom:14px">
-        <span style="font-size:12px;color:var(--muted);font-weight:600">Points to add</span>
-        <span style="font-size:20px;font-weight:700;color:var(--gold)" id="scan-points-total">0 pts</span>
+        <span style="font-size:12px;color:var(--muted);font-weight:600">Amount to add (DA)</span>
+        <span style="font-size:20px;font-weight:700;color:var(--gold)" id="scan-points-total">0 DA</span>
       </div>
       <button class="btn btn-gold" style="width:100%" id="scan-confirm-btn" onclick="confirmScanPoints()" disabled>Confirm</button>
     </div>`;
@@ -12639,7 +13069,7 @@ function renderScanMenuGrid() {
       ${selected ? `<div style="position:absolute;top:6px;right:6px;width:18px;height:18px;border-radius:50%;background:var(--gold);color:white;font-size:12px;display:flex;align-items:center;justify-content:center;font-weight:700">✓</div>` : ''}
       ${item.image_url ? `<img src="${item.image_url}" class="co-menu-item-photo" alt="${item.name}">` : `<div class="co-menu-item-emoji">${item.emoji || '☕'}</div>`}
       <div class="co-menu-item-name">${item.name}</div>
-      <div class="co-menu-item-price">${item.pts || 0} pts</div>
+      <div class="co-menu-item-price">${item.price || 0} DA</div>
     </div>`;
   }).join('');
 }
@@ -12654,9 +13084,9 @@ function toggleScanMenuItem(itemId) {
 function updateScanPointsTotal() {
   const total = [...scanSelection.selectedIds].reduce((sum, id) => {
     const item = adminData.menuItems.find(i => i.id === id);
-    return sum + (item?.pts || 0);
+    return sum + (item?.price || 0);
   }, 0);
-  set('scan-points-total', total.toLocaleString() + ' pts');
+  set('scan-points-total', total.toLocaleString() + ' DA');
   const btn = document.getElementById('scan-confirm-btn');
   if (btn) btn.disabled = scanSelection.selectedIds.size === 0;
 }
@@ -12670,7 +13100,7 @@ async function confirmScanPoints() {
   const selectedItems = [...scanSelection.selectedIds]
     .map(id => adminData.menuItems.find(i => i.id === id))
     .filter(Boolean);
-  const pts = selectedItems.reduce((sum, i) => sum + (i.pts || 0), 0);
+  const pts = selectedItems.reduce((sum, i) => sum + (i.price || 0), 0);
 
   const btn = document.getElementById('scan-confirm-btn');
   if (btn) { btn.disabled = true; btn.textContent = 'Processing…'; }
@@ -12694,8 +13124,8 @@ async function confirmScanPoints() {
     renderCustomersTable();
 
     const scanResult = document.getElementById('scan-result');
-    if (scanResult) scanResult.innerHTML = `<div style="padding:20px;text-align:center;color:var(--muted)"><div style="font-size:32px;margin-bottom:8px">🎉</div>✅ +${pts} pts added for ${c.name}!<br><span style="font-size:12px">${itemsSummary}</span></div>`;
-    toast(`✅ Added ${pts} pts to ${c.name}`);
+    if (scanResult) scanResult.innerHTML = `<div style="padding:20px;text-align:center;color:var(--muted)"><div style="font-size:32px;margin-bottom:8px">🎉</div>✅ +${pts.toLocaleString()} DA added for ${c.name}!<br><span style="font-size:12px">${itemsSummary}</span></div>`;
+    toast(`✅ Added ${pts.toLocaleString()} DA to ${c.name}`);
 
   } catch (err) {
     toast('❌ Error: ' + err.message);
@@ -12728,7 +13158,7 @@ function populateQuickCustomerDropdown() {
   const sel = document.getElementById('quick-customer');
   if (!sel) return;
   sel.innerHTML = '<option value="">Select customer…</option>' +
-    adminData.customers.map(c => `<option value="${c.id}">${c.name} (${c.points||0} pts)</option>`).join('');
+    adminData.customers.map(c => `<option value="${c.id}">${c.name} (${(c.points||0).toLocaleString()} DA)</option>`).join('');
 }
 
 // ════════════════════════════════════════
@@ -12759,14 +13189,14 @@ function quickAddPoints() {
   const custId = document.getElementById('quick-customer')?.value;
   const pts    = parseInt(document.getElementById('quick-pts')?.value);
   if (!custId) { toast('Select a customer first'); return; }
-  if (!pts || pts <= 0) { toast('Enter a valid number of points'); return; }
+  if (!pts || pts <= 0) { toast('Enter a valid amount in DA'); return; }
   const c = adminData.customers.find(c => c.id === custId);
   if (!c) { toast('Customer not found'); return; }
   addBonusPoints(custId, c.name || 'Customer', pts);
 }
 
 async function addBonusPoints(customerId, name, ptsOverride) {
-  const pts = ptsOverride || parseInt(prompt(`Add bonus points to ${name}:\nHow many points?`));
+  const pts = ptsOverride || parseInt(prompt(`Add bonus amount (DA) to ${name}:\nHow much did they spend?`));
   if (!pts || pts <= 0) return;
   const c = adminData.customers.find(c => c.id === customerId);
   if (!c) return;
@@ -12781,7 +13211,7 @@ async function addBonusPoints(customerId, name, ptsOverride) {
   // Clear quick pts input
   const qp = document.getElementById('quick-pts');
   if (qp) qp.value = '';
-  toast(`✅ Added ${pts} pts to ${name}`);
+  toast(`✅ Added ${pts.toLocaleString()} DA to ${name}`);
 }
 
 // ════════════════════════════════════════
@@ -12829,7 +13259,7 @@ function renderCounterCustomerOptions(query) {
   box.innerHTML = matches.map(c => `
     <div class="co-dropdown-item" onclick='selectCounterCustomer(${JSON.stringify(c.id)})'>
       <span>${c.name || 'Unnamed'} <span class="co-dd-id">${c.email || ''}</span></span>
-      <span class="status-badge status-${c.tier || 'Bronze'}">${(c.points||0)} pts</span>
+      <span class="status-badge status-${c.tier || 'Bronze'}">${(c.points||0).toLocaleString()} DA</span>
     </div>`).join('');
   box.classList.add('open');
 }
@@ -12893,8 +13323,8 @@ function renderCounterSelectedCustomer() {
       </div>
       <span class="status-badge status-${c.tier || 'Bronze'}">${c.tier || 'Bronze'}</span>
       <div style="text-align:right;min-width:70px">
-        <div style="font-size:11px;color:var(--muted)">Current pts</div>
-        <div style="font-size:15px;font-weight:700;color:var(--gold)">${(c.points||0).toLocaleString()}</div>
+        <div style="font-size:11px;color:var(--muted)">DA Spent</div>
+        <div style="font-size:15px;font-weight:700;color:var(--gold)">${(c.points||0).toLocaleString()} DA</div>
       </div>
       <button class="btn btn-ghost btn-sm" onclick="counterOrder.customer=null;renderCounterSelectedCustomer();renderCounterTotals();">Change</button>
     </div>`;
@@ -12958,9 +13388,8 @@ function renderCounterOrderList() {
 
 function renderCounterTotals() {
   const total = counterOrder.items.reduce((s, i) => s + i.price * i.qty, 0);
-  const pts   = Math.floor(total / DA_PER_POINT);
   set('co-total-amount', total.toLocaleString() + ' DA');
-  set('co-total-points', pts.toLocaleString() + ' pts');
+  set('co-total-points', '+' + total.toLocaleString() + ' DA');
   updateCompleteButtonState();
 }
 
@@ -12976,7 +13405,7 @@ async function completeCounterOrder() {
   if (!counterOrder.items.length) { toast('Add at least one item'); return; }
 
   const total = counterOrder.items.reduce((s, i) => s + i.price * i.qty, 0);
-  const pts   = Math.floor(total / DA_PER_POINT);
+  const pts   = total; // DA spent = loyalty value directly
   const btn   = document.getElementById('co-complete-btn');
   if (btn) { btn.disabled = true; btn.textContent = 'Processing…'; }
 
@@ -13004,7 +13433,7 @@ async function completeCounterOrder() {
     populateQuickCustomerDropdown();
     renderCustomersTable();
 
-    toast(`✅ ${pts} pts added to ${c.name} (${total.toLocaleString()} DA)`);
+    toast(`✅ ${total.toLocaleString()} DA added to ${c.name}`);
     resetCounterOrder();
 
   } catch (err) {
@@ -13030,29 +13459,15 @@ function bootAdminApp() {
   }
 }
 
-async function getAdminPassword() {
-  try {
-    const { data, error } = await db.from('app_settings').select('value').eq('key', 'admin_password').single();
-    if (!error && data) return data.value;
-  } catch (e) { /* table may not exist yet — fall back below */ }
-  return ADMIN_PASSWORD; // fallback default if app_settings isn't set up yet
-}
-
-async function tryAdminUnlock() {
-  const input = document.getElementById('admin-lock-input');
+function tryAdminUnlock() {
+  const input   = document.getElementById('admin-lock-input');
   const errorEl = document.getElementById('admin-lock-error');
-  const btn = document.getElementById('admin-lock-btn');
-  const entered = input ? input.value : '';
-  if (btn) { btn.disabled = true; btn.textContent = 'Checking…'; }
+  const entered = input ? input.value.trim() : '';
 
-  const currentPassword = await getAdminPassword();
-
-  if (btn) { btn.disabled = false; btn.textContent = 'Unlock'; }
-
-  if (entered === currentPassword) {
+  if (entered === (window.ADMIN_PASSWORD || 'heycat2026')) {
     localStorage.setItem('heycat_admin_unlocked', 'true');
-    const lock = document.getElementById('admin-lock');
-    if (lock) lock.style.display = 'none';
+    document.getElementById('admin-lock').style.display = 'none';
+    document.getElementById('layout').style.pointerEvents = '';
     bootAdminApp();
   } else {
     if (errorEl) errorEl.textContent = 'Incorrect password — try again';
@@ -13064,17 +13479,15 @@ async function tryAdminUnlock() {
 // BOOT
 // ════════════════════════════════════════
 window.onload = () => {
-  const lock = document.getElementById('admin-lock');
-  const input = document.getElementById('admin-lock-input');
-
   if (localStorage.getItem('heycat_admin_unlocked') === 'true') {
-    // Already unlocked this browser session — skip straight to the dashboard
-    if (lock) lock.style.display = 'none';
+    document.getElementById('admin-lock').style.display = 'none';
     bootAdminApp();
   } else {
+    document.getElementById('layout').style.pointerEvents = 'none';
+    const input = document.getElementById('admin-lock-input');
     if (input) {
       input.focus();
-      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') tryAdminUnlock(); });
+      input.onkeydown = (e) => { if (e.key === 'Enter') tryAdminUnlock(); };
     }
   }
 };
