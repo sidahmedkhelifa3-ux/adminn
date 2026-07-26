@@ -10897,6 +10897,17 @@ html,body{height:100%;font-family:'Inter',sans-serif;color:var(--text);backgroun
     max-height:260px;
   }
 
+  /* ── Scan item picker: compact on phones (more per row, smaller cards) ── */
+  #scan-menu-grid{ grid-template-columns:repeat(auto-fill,minmax(84px,1fr)); gap:8px; max-height:230px; }
+  #scan-menu-grid .co-menu-item{ padding:8px 5px; }
+  #scan-menu-grid .co-menu-item-photo{ height:42px; margin-bottom:4px; }
+  #scan-menu-grid .co-menu-item-emoji{ font-size:19px; margin-bottom:2px; }
+  #scan-menu-grid .co-menu-item-name{ font-size:11px; }
+  #scan-menu-grid .co-menu-item-price{ font-size:11px; }
+  #scan-menu-search{ padding:9px 12px; font-size:14px; margin-bottom:6px; }
+  #scan-menu-cats{ gap:5px; margin-bottom:8px; }
+  #scan-menu-cats button{ padding:5px 11px !important; font-size:11px !important; }
+
   /* ── Support / customers search ── */
   .search-wrap input{ font-size:14px; padding:10px 12px; }
 
