@@ -10565,6 +10565,11 @@ html,body{height:100%;font-family:'Inter',sans-serif;color:var(--text);backgroun
 .co-menu-item-photo{width:100%;height:56px;object-fit:cover;border-radius:6px;margin-bottom:6px;display:block}
 .co-menu-item-name{font-size:12px;font-weight:600;color:var(--text);line-height:1.3;margin-bottom:2px}
 .co-menu-item-price{font-size:12px;font-weight:700;color:var(--brown)}
+/* POS-style number pad on the scan result */
+.scan-keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.scan-keypad button{padding:18px 0;font-size:22px;font-weight:700;border:1.5px solid var(--border);background:#fff;border-radius:14px;cursor:pointer;color:var(--text);font-family:inherit;transition:transform 0.08s,background 0.15s;-webkit-tap-highlight-color:transparent}
+.scan-keypad button:hover{border-color:var(--gold)}
+.scan-keypad button:active{transform:scale(0.95);background:var(--beige)}
 .co-order-card{background:white;border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px}
 .co-order-list{max-height:220px;overflow-y:auto;margin-bottom:10px}
 .co-order-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)}
@@ -10897,16 +10902,15 @@ html,body{height:100%;font-family:'Inter',sans-serif;color:var(--text);backgroun
     max-height:260px;
   }
 
-  /* ── Scan item picker: compact on phones (more per row, smaller cards) ── */
+  /* ── Scan item picker: compact on phones ── */
   #scan-menu-grid{ grid-template-columns:repeat(auto-fill,minmax(84px,1fr)); gap:8px; max-height:230px; }
   #scan-menu-grid .co-menu-item{ padding:8px 5px; }
   #scan-menu-grid .co-menu-item-photo{ height:42px; margin-bottom:4px; }
   #scan-menu-grid .co-menu-item-emoji{ font-size:19px; margin-bottom:2px; }
   #scan-menu-grid .co-menu-item-name{ font-size:11px; }
   #scan-menu-grid .co-menu-item-price{ font-size:11px; }
-  #scan-menu-search{ padding:9px 12px; font-size:14px; margin-bottom:6px; }
-  #scan-menu-cats{ gap:5px; margin-bottom:8px; }
-  #scan-menu-cats button{ padding:5px 11px !important; font-size:11px !important; }
+  .scan-keypad{ gap:8px; }
+  .scan-keypad button{ padding:15px 0; font-size:20px; }
 
   /* ── Support / customers search ── */
   .search-wrap input{ font-size:14px; padding:10px 12px; }
@@ -13686,48 +13690,87 @@ function handleCameraScanResult(rawValue) {
   showScanResultFor(c);
 }
 
-// Holds the in-progress multi-item selection for the current scan
+// Holds the in-progress selection for the current scan
 let scanSelection = { customerId: null, selectedIds: new Set() };
-let scanFilter = { cat: 'all', q: '' };
-
-const SCAN_CAT_LABELS = { hot: 'Hot', iced: 'Iced', dessert: 'Dessert', snack: 'Snack', drink: 'Drinks', food: 'Food' };
-function scanCatLabel(c) { return SCAN_CAT_LABELS[c] || (c ? c.charAt(0).toUpperCase() + c.slice(1) : 'Other'); }
+let scanMode = 'amount';   // 'amount' (keypad) | 'items' (pick from menu)
+let scanAmount = '';       // typed digits for keypad mode
 
 function showScanResultFor(c) {
   const scanResult = document.getElementById('scan-result');
   if (!scanResult) return;
 
-  // Reset selection + filters for this new scan
+  // Reset state for this new scan
   scanSelection = { customerId: c.id, selectedIds: new Set() };
-  scanFilter = { cat: 'all', q: '' };
+  scanMode = 'amount';
+  scanAmount = '';
+
+  const initials = (c.name || '?').trim().charAt(0).toUpperCase();
+  const keys = ['1','2','3','4','5','6','7','8','9','00','0','back'];
 
   scanResult.innerHTML = `
     <div style="text-align:center;animation:scanResultIn 0.35s ease">
-      <div style="font-size:40px;margin-bottom:10px">✅</div>
-      <div style="font-size:16px;font-weight:700;color:var(--brown);margin-bottom:6px">${c.name}</div>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:12px">${c.email}</div>
-      <div style="background:var(--beige);border-radius:8px;padding:12px;margin-bottom:14px">
-        <div style="font-size:11px;color:var(--muted)">Total Spent (DA)</div>
-        <div style="font-size:24px;font-weight:700;color:var(--gold)">${(c.points||0).toLocaleString()} DA</div>
-        <div style="font-size:11px;color:var(--muted)">Tier: ${c.tier||'Bronze'}</div>
+      <!-- Customer header -->
+      <div style="display:flex;align-items:center;gap:12px;background:var(--beige);border-radius:14px;padding:12px 14px;margin-bottom:16px;text-align:left">
+        <div style="width:46px;height:46px;border-radius:50%;background:var(--brown);color:#fff;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;flex-shrink:0">${initials}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:15px;font-weight:700;color:var(--brown);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.name}</div>
+          <div style="font-size:11px;color:var(--muted)">${(c.points||0).toLocaleString()} DA spent · ${c.tier||'Bronze'}</div>
+        </div>
       </div>
-      <div style="text-align:left;margin-bottom:10px">
-        <label class="input-label">What did they get? (select one or more)</label>
-        <input id="scan-menu-search" class="input-field" placeholder="🔍 Search items…" oninput="filterScanMenu()"
-          style="margin:0 0 8px">
-        <div id="scan-menu-cats" style="display:flex;gap:6px;overflow-x:auto;margin-bottom:10px;padding-bottom:2px"></div>
-        <div class="co-menu-grid" id="scan-menu-grid" style="max-height:300px"></div>
+
+      <!-- AMOUNT (keypad) mode -->
+      <div id="scan-amount-mode">
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:2px">Amount spent</div>
+        <div id="scan-amount-display" style="font-size:46px;font-weight:800;color:var(--brown);line-height:1.1;margin-bottom:16px">0<span style="font-size:18px;color:var(--muted);font-weight:600"> DA</span></div>
+        <div class="scan-keypad">
+          ${keys.map(k => `<button type="button" onclick="scanKey('${k}')">${k === 'back' ? '⌫' : k}</button>`).join('')}
+        </div>
+        <button class="btn btn-ghost" style="width:100%;margin-top:12px" onclick="toggleScanMode('items')">🧾 Pick items instead</button>
       </div>
-      <div style="display:flex;align-items:center;justify-content:space-between;background:var(--beige);border-radius:8px;padding:10px 14px;margin-bottom:14px">
-        <span style="font-size:12px;color:var(--muted);font-weight:600">Amount to add (DA)</span>
-        <span style="font-size:20px;font-weight:700;color:var(--gold)" id="scan-points-total">0 DA</span>
+
+      <!-- ITEMS mode -->
+      <div id="scan-items-mode" style="display:none">
+        <label class="input-label" style="text-align:left;display:block">What did they get?</label>
+        <div class="co-menu-grid" id="scan-menu-grid" style="max-height:280px"></div>
+        <button class="btn btn-ghost" style="width:100%;margin-top:12px" onclick="toggleScanMode('amount')">⌨️ Type amount instead</button>
       </div>
-      <button class="btn btn-gold" style="width:100%" id="scan-confirm-btn" onclick="confirmScanPoints()" disabled>Confirm</button>
+
+      <!-- Confirm -->
+      <div style="display:flex;align-items:center;justify-content:space-between;background:var(--beige);border-radius:10px;padding:12px 16px;margin:16px 0 12px">
+        <span style="font-size:12px;color:var(--muted);font-weight:600">Points to add</span>
+        <span style="font-size:22px;font-weight:800;color:var(--gold)" id="scan-points-total">0 DA</span>
+      </div>
+      <button class="btn btn-gold" style="width:100%;padding:15px" id="scan-confirm-btn" onclick="confirmScanPoints()" disabled>Confirm</button>
     </div>`;
 
-  renderScanMenuGrid();
+  updateScanPointsTotal();
   scanFeedback(true);       // buzz + beep + green pulse the instant a customer is matched
   scrollToScanResult();     // bring the result into view (esp. on phones)
+}
+
+// ── Keypad (amount) mode ──
+function scanKey(k) {
+  if (k === 'back') {
+    scanAmount = scanAmount.slice(0, -1);
+  } else {
+    if (scanAmount === '' && (k === '0' || k === '00')) return; // no leading zeros
+    if ((scanAmount + k).length > 7) return;                    // cap at 9,999,999
+    scanAmount += k;
+  }
+  const val = parseInt(scanAmount || '0', 10);
+  const disp = document.getElementById('scan-amount-display');
+  if (disp) disp.innerHTML = val.toLocaleString() + '<span style="font-size:18px;color:var(--muted);font-weight:600"> DA</span>';
+  updateScanPointsTotal();
+}
+
+function toggleScanMode(mode) {
+  scanMode = mode;
+  const am = document.getElementById('scan-amount-mode');
+  const im = document.getElementById('scan-items-mode');
+  if (am) am.style.display = mode === 'amount' ? '' : 'none';
+  if (im) im.style.display = mode === 'items' ? '' : 'none';
+  if (mode === 'items') renderScanMenuGrid();
+  updateScanPointsTotal();
 }
 
 function renderScanMenuGrid() {
@@ -13738,32 +13781,7 @@ function renderScanMenuGrid() {
     grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--muted);font-size:13px">No menu items yet — add some from the Menu panel.</div>`;
     return;
   }
-
-  // Category tabs (All + each category present in the menu)
-  const cats = [...new Set(items.map(i => i.cat).filter(Boolean))];
-  const tabsEl = document.getElementById('scan-menu-cats');
-  if (tabsEl) {
-    tabsEl.innerHTML = ['all', ...cats].map(cat => {
-      const active = scanFilter.cat === cat;
-      const label = cat === 'all' ? 'All' : scanCatLabel(cat);
-      return `<button onclick="setScanCategory('${cat}')" style="flex-shrink:0;padding:6px 14px;border-radius:16px;
-        border:1.5px solid ${active ? 'var(--brown)' : 'var(--border,#ddd)'};background:${active ? 'var(--brown)' : 'transparent'};
-        color:${active ? '#fff' : 'var(--text)'};font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">${label}</button>`;
-    }).join('');
-  }
-
-  // Filter by category + search text
-  const q = (scanFilter.q || '').toLowerCase();
-  let filtered = items;
-  if (scanFilter.cat !== 'all') filtered = filtered.filter(i => i.cat === scanFilter.cat);
-  if (q) filtered = filtered.filter(i => (i.name || '').toLowerCase().includes(q));
-
-  if (!filtered.length) {
-    grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--muted);font-size:13px">No items found</div>`;
-    return;
-  }
-
-  grid.innerHTML = filtered.map(item => {
+  grid.innerHTML = items.map(item => {
     const selected = scanSelection.selectedIds.has(item.id);
     return `
     <div class="co-menu-item" style="position:relative;${selected ? 'border-color:var(--gold);background:rgba(200,150,42,0.08)' : ''}" onclick='toggleScanMenuItem(${JSON.stringify(item.id)})'>
@@ -13775,17 +13793,6 @@ function renderScanMenuGrid() {
   }).join('');
 }
 
-function setScanCategory(cat) {
-  scanFilter.cat = cat;
-  renderScanMenuGrid();
-}
-
-function filterScanMenu() {
-  const el = document.getElementById('scan-menu-search');
-  scanFilter.q = el ? el.value : '';
-  renderScanMenuGrid();
-}
-
 function toggleScanMenuItem(itemId) {
   if (scanSelection.selectedIds.has(itemId)) scanSelection.selectedIds.delete(itemId);
   else scanSelection.selectedIds.add(itemId);
@@ -13793,26 +13800,43 @@ function toggleScanMenuItem(itemId) {
   updateScanPointsTotal();
 }
 
+// Points total = typed amount (keypad) or sum of picked items
+function scanTotal() {
+  if (scanMode === 'items') {
+    return [...scanSelection.selectedIds].reduce((sum, id) => {
+      const item = adminData.menuItems.find(i => i.id === id);
+      return sum + (item?.price || 0);
+    }, 0);
+  }
+  return parseInt(scanAmount || '0', 10);
+}
+
 function updateScanPointsTotal() {
-  const total = [...scanSelection.selectedIds].reduce((sum, id) => {
-    const item = adminData.menuItems.find(i => i.id === id);
-    return sum + (item?.price || 0);
-  }, 0);
+  const total = scanTotal();
   set('scan-points-total', total.toLocaleString() + ' DA');
   const btn = document.getElementById('scan-confirm-btn');
-  if (btn) btn.disabled = scanSelection.selectedIds.size === 0;
+  if (btn) btn.disabled = total <= 0;
 }
 
 async function confirmScanPoints() {
   const customerId = scanSelection.customerId;
   const c = adminData.customers.find(c => c.id === customerId);
   if (!c) { toast('Customer not found'); return; }
-  if (!scanSelection.selectedIds.size) { toast('Pick at least one item first'); return; }
 
-  const selectedItems = [...scanSelection.selectedIds]
-    .map(id => adminData.menuItems.find(i => i.id === id))
-    .filter(Boolean);
-  const pts = selectedItems.reduce((sum, i) => sum + (i.price || 0), 0);
+  // Amount + description depend on the mode (typed keypad amount, or picked items)
+  let pts, itemsSummary;
+  if (scanMode === 'items') {
+    const selectedItems = [...scanSelection.selectedIds]
+      .map(id => adminData.menuItems.find(i => i.id === id))
+      .filter(Boolean);
+    if (!selectedItems.length) { toast('Pick at least one item first'); return; }
+    pts = selectedItems.reduce((sum, i) => sum + (i.price || 0), 0);
+    itemsSummary = selectedItems.map(i => i.name).join(', ');
+  } else {
+    pts = parseInt(scanAmount || '0', 10);
+    if (!pts || pts <= 0) { toast('Enter an amount first'); return; }
+    itemsSummary = 'Counter purchase';
+  }
 
   const btn = document.getElementById('scan-confirm-btn');
   if (btn) { btn.disabled = true; btn.textContent = 'Processing…'; }
@@ -13825,7 +13849,6 @@ async function confirmScanPoints() {
     const { error } = await db.from('profiles').update({ points: newPts, tier: newTier, drink_progress: newDrinkProgress }).eq('id', customerId);
     if (error) throw error;
 
-    const itemsSummary = selectedItems.map(i => i.name).join(', ');
     const { error: historyErr } = await db.from('points_history').insert({
       customer_id: customerId, type:'earn', description: itemsSummary, pts
     });
