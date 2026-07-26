@@ -2,8 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>HEY CAT — Admin Dashboard</title>
+<!-- PWA / Add to Home Screen -->
+<meta name="theme-color" content="#3D1F08">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="HEYCAT Scan">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -10939,6 +10945,9 @@ html,body{height:100%;font-family:'Inter',sans-serif;color:var(--text);backgroun
   </div>
 
   <div class="sidebar-bottom">
+    <button class="btn btn-ghost pwa-install-btn" onclick="installPWA()"
+      style="width:100%;margin-bottom:12px;display:flex;align-items:center;justify-content:center;gap:8px">
+      📲 Add to Home Screen</button>
     <div class="sidebar-user" onclick="adminSignOut()" style="cursor:pointer" title="Click to sign out">
       <div class="sidebar-avatar">A</div>
       <div>
@@ -10988,6 +10997,20 @@ html,body{height:100%;font-family:'Inter',sans-serif;color:var(--text);backgroun
   <button class="mmore-row nav-item" onclick="switchPanel('support',this);toggleMoreMenu()">
     <span class="nav-icon">🆘</span> Support
   </button>
+  <button class="mmore-row nav-item pwa-install-btn" onclick="installPWA();toggleMoreMenu()">
+    <span class="nav-icon">📲</span> Add to Home Screen
+  </button>
+</div>
+
+<!-- Add-to-Home-Screen help (shown on iOS / browsers without a native install prompt) -->
+<div id="pwa-help" style="display:none;position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,0.5);align-items:center;justify-content:center;padding:20px"
+  onclick="if(event.target===this)this.style.display='none'">
+  <div style="background:var(--cream);border-radius:16px;padding:26px 24px;max-width:340px;width:100%;text-align:center;box-shadow:var(--shadow-lg)">
+    <div style="font-size:36px;margin-bottom:8px">📲</div>
+    <div style="font-family:'Playfair Display',serif;font-weight:700;color:var(--brown);font-size:18px;margin-bottom:10px">Add to Home Screen</div>
+    <div id="pwa-help-text" style="font-size:13.5px;color:var(--text);line-height:1.65;margin-bottom:20px"></div>
+    <button class="btn btn-gold" style="width:100%" onclick="document.getElementById('pwa-help').style.display='none'">Got it</button>
+  </div>
 </div>
 
 <!-- ════ MAIN ════ -->
@@ -14145,6 +14168,10 @@ function bootAdminApp() {
   renderCounterMenuGrid();
   renderCounterSelectedCustomer();
   renderCounterOrderList();
+  // Opened from the home screen (or ?launch=scanner)? Go straight to the Scanner.
+  if (typeof launchedForScanner === 'function' && launchedForScanner()) {
+    switchPanel('scanner');
+  }
   // Ask for push permission once the dashboard is visible
   if (typeof requestAdminPushPermission === 'function' && Notification.permission === 'default') {
     setTimeout(() => requestAdminPushPermission(), 1500);
@@ -14198,9 +14225,123 @@ async function adminSignOut() {
 }
 
 // ════════════════════════════════════════
+// PWA — "Add to Home Screen", launches straight into the Scanner
+// ════════════════════════════════════════
+let deferredInstallPrompt = null;
+
+// Running as an installed app (from the home screen) rather than a browser tab?
+function isStandalone() {
+  return window.matchMedia('(display-mode: standalone)').matches
+      || window.matchMedia('(display-mode: fullscreen)').matches
+      || window.navigator.standalone === true;
+}
+
+// Should we jump straight to the Scanner on open?
+function launchedForScanner() {
+  try {
+    if (new URLSearchParams(location.search).get('launch') === 'scanner') return true;
+  } catch (e) {}
+  return isStandalone();
+}
+
+// Draw the home-screen icon on a canvas so we don't need separate image files.
+function makeAppIcon(size) {
+  const c = document.createElement('canvas'); c.width = c.height = size;
+  const x = c.getContext('2d');
+  const r = size * 0.22;
+  x.fillStyle = '#3D1F08';
+  x.beginPath();
+  x.moveTo(r, 0); x.arcTo(size, 0, size, size, r); x.arcTo(size, size, 0, size, r);
+  x.arcTo(0, size, 0, 0, r); x.arcTo(0, 0, size, 0, r); x.closePath(); x.fill();
+  x.fillStyle = '#F5C842';
+  x.font = `bold ${size * 0.4}px 'Inter', sans-serif`;
+  x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.fillText('HC', size / 2, size / 2 + size * 0.02);
+  return c.toDataURL('image/png');
+}
+
+function setupPWA() {
+  const icon192 = makeAppIcon(192);
+  const icon512 = makeAppIcon(512);
+
+  // Build the manifest in-page (no separate file needed). start_url carries the
+  // "launch=scanner" flag so an opened app knows to show the Scanner first.
+  const manifest = {
+    name: 'HEYCAT Admin Scanner',
+    short_name: 'HEYCAT Scan',
+    start_url: './?launch=scanner',
+    scope: './',
+    display: 'standalone',
+    orientation: 'portrait',
+    background_color: '#2A1205',
+    theme_color: '#3D1F08',
+    icons: [
+      { src: icon192, sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
+      { src: icon512, sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
+    ],
+  };
+  try {
+    const url = URL.createObjectURL(new Blob([JSON.stringify(manifest)], { type: 'application/json' }));
+    let link = document.querySelector('link[rel="manifest"]');
+    if (!link) { link = document.createElement('link'); link.rel = 'manifest'; document.head.appendChild(link); }
+    link.href = url;
+  } catch (e) {}
+
+  // iOS home-screen icon
+  let al = document.querySelector('link[rel="apple-touch-icon"]');
+  if (!al) { al = document.createElement('link'); al.rel = 'apple-touch-icon'; document.head.appendChild(al); }
+  al.href = icon192;
+
+  // (The service worker is already registered elsewhere in this file — see the
+  // navigator.serviceWorker.register('/sw.js') call near the top.)
+
+  // Capture the native install prompt (Android/desktop Chrome & Edge)
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+  });
+  window.addEventListener('appinstalled', () => {
+    deferredInstallPrompt = null;
+    if (typeof toast === 'function') toast('✅ Installed! Open it from your home screen.');
+  });
+
+  // If we're already installed, the "Add to Home Screen" buttons aren't needed.
+  if (isStandalone()) {
+    document.querySelectorAll('.pwa-install-btn').forEach(b => b.style.display = 'none');
+  }
+}
+
+async function installPWA() {
+  if (isStandalone()) { toast('Already installed — open it from your home screen'); return; }
+
+  // Native prompt available (Android / desktop Chrome, Edge)
+  if (deferredInstallPrompt) {
+    deferredInstallPrompt.prompt();
+    try {
+      const { outcome } = await deferredInstallPrompt.userChoice;
+      if (outcome !== 'accepted') toast('You can add it anytime from your browser menu');
+    } catch (e) {}
+    deferredInstallPrompt = null;
+    return;
+  }
+
+  // No native prompt (iOS Safari, or prompt not ready yet) → show instructions
+  const ua = navigator.userAgent || '';
+  const isIOS = /iphone|ipad|ipod/i.test(ua) || (/(macintosh)/i.test(ua) && 'ontouchend' in document);
+  const text = isIOS
+    ? 'In <b>Safari</b>, tap the <b>Share</b> button (the square with an ↑), then choose <b>“Add to Home Screen”</b>.'
+    : 'Open your browser menu (⋮ or ⋯) and choose <b>“Install app”</b> or <b>“Add to Home screen”</b>.';
+  const box = document.getElementById('pwa-help-text');
+  if (box) box.innerHTML = text;
+  const modal = document.getElementById('pwa-help');
+  if (modal) modal.style.display = 'flex';
+}
+
+// ════════════════════════════════════════
 // BOOT
 // ════════════════════════════════════════
 window.onload = async () => {
+  setupPWA();
   const { data: { session } } = await db.auth.getSession();
 
   if (session?.user) {
