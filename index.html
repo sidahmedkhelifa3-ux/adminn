@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>HEY CAT — Admin Dashboard</title>
 <!-- PWA / Add to Home Screen -->
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="admin-logo.png">
 <meta name="theme-color" content="#3D1F08">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -77,7 +79,21 @@
 
   // Register service worker
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js').catch(err =>
+    // When a newly-deployed service worker takes control, reload once so the
+    // latest admin code is applied immediately. Guarded so it doesn't reload on
+    // the very first visit (when the page wasn't controlled yet).
+    if (navigator.serviceWorker.controller) {
+      let swReloading = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (swReloading) return;
+        swReloading = true;
+        window.location.reload();
+      });
+    }
+    navigator.serviceWorker.register('/sw.js').then(reg => {
+      // Check for a new version on every load
+      if (reg && reg.update) reg.update();
+    }).catch(err =>
       console.warn('[HEYCAT ADMIN] SW registration failed:', err)
     );
   }
@@ -10895,6 +10911,7 @@ html,body{height:100%;font-family:'Inter',sans-serif;color:var(--text);backgroun
 <!-- ════ ADMIN PASSWORD GATE ════ -->
 <div id="admin-lock" style="position:fixed;inset:0;z-index:9999;background:linear-gradient(135deg,var(--brown),var(--dark));display:flex;align-items:center;justify-content:center;padding:20px">
   <div style="background:var(--cream);border-radius:var(--radius-lg);padding:36px 32px;max-width:360px;width:100%;box-shadow:var(--shadow-lg);text-align:center">
+    <img src="admin-logo.png" alt="HEYCAT" style="width:76px;height:76px;object-fit:contain;margin:0 auto 10px;display:block">
     <div style="font-family:'Playfair Display',serif;font-weight:700;font-size:20px;color:var(--brown);margin-bottom:4px">HEYCAT Admin</div>
     <div style="font-size:13px;color:var(--muted);margin-bottom:22px">Sign in with your admin account</div>
     <input type="email" id="admin-lock-email" class="input-field" placeholder="Email" style="text-align:center;margin-bottom:10px" autocomplete="username">
@@ -10909,6 +10926,7 @@ html,body{height:100%;font-family:'Inter',sans-serif;color:var(--text);backgroun
 <!-- ════ SIDEBAR ════ -->
 <aside id="sidebar">
   <div class="sidebar-logo">
+    <img src="admin-logo.png" alt="HEYCAT" style="width:44px;height:44px;object-fit:contain;margin-bottom:6px">
     <div class="sidebar-logo-name">HEYCAT</div>
     <div class="sidebar-logo-sub">ADMIN DASHBOARD</div>
   </div>
@@ -11018,9 +11036,13 @@ html,body{height:100%;font-family:'Inter',sans-serif;color:var(--text);backgroun
 
   <!-- TOP BAR -->
   <header id="topbar">
-    <div>
-      <div class="topbar-title" id="topbar-title">Overview</div>
-      <div class="topbar-subtitle" id="topbar-subtitle">Good morning — here's what's happening today</div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <img src="admin-logo.png" alt="HEYCAT"
+        style="width:42px;height:42px;object-fit:contain;background:#fff;border-radius:11px;padding:3px;flex-shrink:0;box-shadow:0 1px 4px rgba(0,0,0,0.12)">
+      <div>
+        <div class="topbar-title" id="topbar-title">Overview</div>
+        <div class="topbar-subtitle" id="topbar-subtitle">Good morning — here's what's happening today</div>
+      </div>
     </div>
     <div class="topbar-right">
       <div class="topbar-time" id="topbar-time"></div>
@@ -11725,7 +11747,11 @@ let currentPanelName   = 'overview';
 async function initAdmin() {
   await loadAllData();
   subscribeRealtime();
-  switchPanel('overview', document.querySelector('.nav-item.active'));
+  // Land on the Scanner when opened as an installed app (?launch=scanner /
+  // standalone); otherwise default to Overview. Passing null lets switchPanel
+  // highlight the correct nav item itself.
+  const target = (typeof launchedForScanner === 'function' && launchedForScanner()) ? 'scanner' : 'overview';
+  switchPanel(target, null);
 }
 
 // ════════════════════════════════════════
@@ -13590,6 +13616,15 @@ function stopCameraScan() {
   if (status) status.textContent = 'Camera is off';
 }
 
+// When the app is sent to the background (switched away, screen off), release
+// the camera. A backgrounded PWA that keeps holding the camera is one of the
+// main reasons phones kill/reload the app — so this keeps it alive on return.
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && typeof cameraActive !== 'undefined' && cameraActive) {
+    stopCameraScan();
+  }
+});
+
 function scanFrameLoop() {
   if (!cameraActive) return;
   const video  = document.getElementById('scan-video');
@@ -14244,56 +14279,9 @@ function launchedForScanner() {
   return isStandalone();
 }
 
-// Draw the home-screen icon on a canvas so we don't need separate image files.
-function makeAppIcon(size) {
-  const c = document.createElement('canvas'); c.width = c.height = size;
-  const x = c.getContext('2d');
-  const r = size * 0.22;
-  x.fillStyle = '#3D1F08';
-  x.beginPath();
-  x.moveTo(r, 0); x.arcTo(size, 0, size, size, r); x.arcTo(size, size, 0, size, r);
-  x.arcTo(0, size, 0, 0, r); x.arcTo(0, 0, size, 0, r); x.closePath(); x.fill();
-  x.fillStyle = '#F5C842';
-  x.font = `bold ${size * 0.4}px 'Inter', sans-serif`;
-  x.textAlign = 'center'; x.textBaseline = 'middle';
-  x.fillText('HC', size / 2, size / 2 + size * 0.02);
-  return c.toDataURL('image/png');
-}
-
 function setupPWA() {
-  const icon192 = makeAppIcon(192);
-  const icon512 = makeAppIcon(512);
-
-  // Build the manifest in-page (no separate file needed). start_url carries the
-  // "launch=scanner" flag so an opened app knows to show the Scanner first.
-  const manifest = {
-    name: 'HEYCAT Admin Scanner',
-    short_name: 'HEYCAT Scan',
-    start_url: './?launch=scanner',
-    scope: './',
-    display: 'standalone',
-    orientation: 'portrait',
-    background_color: '#2A1205',
-    theme_color: '#3D1F08',
-    icons: [
-      { src: icon192, sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
-      { src: icon512, sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
-    ],
-  };
-  try {
-    const url = URL.createObjectURL(new Blob([JSON.stringify(manifest)], { type: 'application/json' }));
-    let link = document.querySelector('link[rel="manifest"]');
-    if (!link) { link = document.createElement('link'); link.rel = 'manifest'; document.head.appendChild(link); }
-    link.href = url;
-  } catch (e) {}
-
-  // iOS home-screen icon
-  let al = document.querySelector('link[rel="apple-touch-icon"]');
-  if (!al) { al = document.createElement('link'); al.rel = 'apple-touch-icon'; document.head.appendChild(al); }
-  al.href = icon192;
-
-  // (The service worker is already registered elsewhere in this file — see the
-  // navigator.serviceWorker.register('/sw.js') call near the top.)
+  // The manifest (manifest.json) and apple-touch-icon are linked statically in
+  // <head>, and the service worker is registered near the top of this file.
 
   // Capture the native install prompt (Android/desktop Chrome & Edge)
   window.addEventListener('beforeinstallprompt', (e) => {
