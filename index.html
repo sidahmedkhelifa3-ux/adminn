@@ -11018,6 +11018,10 @@ html,body{height:100%;font-family:'Inter',sans-serif;color:var(--text);backgroun
   <button class="mmore-row nav-item pwa-install-btn" onclick="installPWA();toggleMoreMenu()">
     <span class="nav-icon">📲</span> Add to Home Screen
   </button>
+  <button class="mmore-row nav-item" onclick="toggleMoreMenu();adminSignOut()"
+    style="color:#c0392b;margin-top:8px;border-top:1px solid rgba(0,0,0,0.06);padding-top:14px">
+    <span class="nav-icon">🚪</span> Logout
+  </button>
 </div>
 
 <!-- Add-to-Home-Screen help (shown on iOS / browsers without a native install prompt) -->
@@ -11037,8 +11041,9 @@ html,body{height:100%;font-family:'Inter',sans-serif;color:var(--text);backgroun
   <!-- TOP BAR -->
   <header id="topbar">
     <div style="display:flex;align-items:center;gap:12px">
-      <img src="admin-logo.png" alt="HEYCAT"
-        style="width:42px;height:42px;object-fit:contain;background:#fff;border-radius:11px;padding:2px;flex-shrink:0;box-shadow:0 1px 4px rgba(0,0,0,0.12)">
+      <div style="width:42px;height:42px;background:#fff;border-radius:11px;flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,0.12)">
+        <img src="admin-logo.png" alt="HEYCAT" style="width:160%;height:160%;object-fit:contain">
+      </div>
       <div>
         <div class="topbar-title" id="topbar-title">Overview</div>
         <div class="topbar-subtitle" id="topbar-subtitle">Good morning — here's what's happening today</div>
