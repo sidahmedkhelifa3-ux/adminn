@@ -6,7 +6,7 @@
 <title>HEY CAT — Admin Dashboard</title>
 <!-- PWA / Add to Home Screen -->
 <link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="admin-logo.png">
+<link rel="apple-touch-icon" href="admin-icon.png">
 <meta name="theme-color" content="#3D1F08">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -13677,13 +13677,18 @@ function handleCameraScanResult(rawValue) {
 
 // Holds the in-progress multi-item selection for the current scan
 let scanSelection = { customerId: null, selectedIds: new Set() };
+let scanFilter = { cat: 'all', q: '' };
+
+const SCAN_CAT_LABELS = { hot: 'Hot', iced: 'Iced', dessert: 'Dessert', snack: 'Snack', drink: 'Drinks', food: 'Food' };
+function scanCatLabel(c) { return SCAN_CAT_LABELS[c] || (c ? c.charAt(0).toUpperCase() + c.slice(1) : 'Other'); }
 
 function showScanResultFor(c) {
   const scanResult = document.getElementById('scan-result');
   if (!scanResult) return;
 
-  // Reset selection state for this new scan
+  // Reset selection + filters for this new scan
   scanSelection = { customerId: c.id, selectedIds: new Set() };
+  scanFilter = { cat: 'all', q: '' };
 
   scanResult.innerHTML = `
     <div style="text-align:center;animation:scanResultIn 0.35s ease">
@@ -13697,6 +13702,9 @@ function showScanResultFor(c) {
       </div>
       <div style="text-align:left;margin-bottom:10px">
         <label class="input-label">What did they get? (select one or more)</label>
+        <input id="scan-menu-search" class="input-field" placeholder="🔍 Search items…" oninput="filterScanMenu()"
+          style="margin:0 0 8px">
+        <div id="scan-menu-cats" style="display:flex;gap:6px;overflow-x:auto;margin-bottom:10px;padding-bottom:2px"></div>
         <div class="co-menu-grid" id="scan-menu-grid" style="max-height:300px"></div>
       </div>
       <div style="display:flex;align-items:center;justify-content:space-between;background:var(--beige);border-radius:8px;padding:10px 14px;margin-bottom:14px">
@@ -13714,11 +13722,37 @@ function showScanResultFor(c) {
 function renderScanMenuGrid() {
   const grid = document.getElementById('scan-menu-grid');
   if (!grid) return;
-  if (!adminData.menuItems.length) {
+  const items = adminData.menuItems || [];
+  if (!items.length) {
     grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--muted);font-size:13px">No menu items yet — add some from the Menu panel.</div>`;
     return;
   }
-  grid.innerHTML = adminData.menuItems.map(item => {
+
+  // Category tabs (All + each category present in the menu)
+  const cats = [...new Set(items.map(i => i.cat).filter(Boolean))];
+  const tabsEl = document.getElementById('scan-menu-cats');
+  if (tabsEl) {
+    tabsEl.innerHTML = ['all', ...cats].map(cat => {
+      const active = scanFilter.cat === cat;
+      const label = cat === 'all' ? 'All' : scanCatLabel(cat);
+      return `<button onclick="setScanCategory('${cat}')" style="flex-shrink:0;padding:6px 14px;border-radius:16px;
+        border:1.5px solid ${active ? 'var(--brown)' : 'var(--border,#ddd)'};background:${active ? 'var(--brown)' : 'transparent'};
+        color:${active ? '#fff' : 'var(--text)'};font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">${label}</button>`;
+    }).join('');
+  }
+
+  // Filter by category + search text
+  const q = (scanFilter.q || '').toLowerCase();
+  let filtered = items;
+  if (scanFilter.cat !== 'all') filtered = filtered.filter(i => i.cat === scanFilter.cat);
+  if (q) filtered = filtered.filter(i => (i.name || '').toLowerCase().includes(q));
+
+  if (!filtered.length) {
+    grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--muted);font-size:13px">No items found</div>`;
+    return;
+  }
+
+  grid.innerHTML = filtered.map(item => {
     const selected = scanSelection.selectedIds.has(item.id);
     return `
     <div class="co-menu-item" style="position:relative;${selected ? 'border-color:var(--gold);background:rgba(200,150,42,0.08)' : ''}" onclick='toggleScanMenuItem(${JSON.stringify(item.id)})'>
@@ -13728,6 +13762,17 @@ function renderScanMenuGrid() {
       <div class="co-menu-item-price">${item.price || 0} DA</div>
     </div>`;
   }).join('');
+}
+
+function setScanCategory(cat) {
+  scanFilter.cat = cat;
+  renderScanMenuGrid();
+}
+
+function filterScanMenu() {
+  const el = document.getElementById('scan-menu-search');
+  scanFilter.q = el ? el.value : '';
+  renderScanMenuGrid();
 }
 
 function toggleScanMenuItem(itemId) {
