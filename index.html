@@ -10489,6 +10489,23 @@ html,body{height:100%;font-family:'Inter',sans-serif;color:var(--text);backgroun
 .scan-corner.bl{bottom:10px;left:10px;border-bottom:3px solid var(--brown);border-left:3px solid var(--brown);border-radius:0 0 0 4px}
 .scan-corner.br{bottom:10px;right:10px;border-bottom:3px solid var(--brown);border-right:3px solid var(--brown);border-radius:0 0 4px 0}
 
+/* ── Scan feedback: green pulse on a hit, red on a miss ── */
+.scan-box.scan-hit{ animation:scanHit 0.55s ease; border-color:#2D7A4F !important; }
+@keyframes scanHit{
+  0%{ box-shadow:0 0 0 0 rgba(45,122,79,0.55); }
+  35%{ box-shadow:0 0 0 8px rgba(45,122,79,0.45); }
+  100%{ box-shadow:0 0 0 0 rgba(45,122,79,0); }
+}
+.scan-box.scan-miss{ animation:scanMiss 0.5s ease; border-color:#c0392b !important; }
+@keyframes scanMiss{
+  0%,100%{ transform:translateX(0); }
+  20%{ transform:translateX(-6px); }
+  40%{ transform:translateX(6px); }
+  60%{ transform:translateX(-4px); }
+  80%{ transform:translateX(4px); }
+}
+@keyframes scanResultIn{ from{ opacity:0; transform:translateY(10px) scale(0.98); } to{ opacity:1; transform:none; } }
+
 /* ══ COUNTER ORDER PANEL ══ */
 .co-dropdown{
   position:relative;margin-top:4px;
@@ -10847,6 +10864,11 @@ html,body{height:100%;font-family:'Inter',sans-serif;color:var(--text);backgroun
   .scan-box{ width:min(280px,100%); height:auto; aspect-ratio:1/1; margin:0 auto; }
   #scan-result-card{ margin-top:0; }
 
+  /* ── QR customization card: tidy colour pickers + full-width buttons ── */
+  #qr-custom-card .qr-color-row{ gap:16px; }
+  #qr-custom-card .qr-color-actions{ margin-left:0; width:100%; margin-top:4px; }
+  #qr-custom-card .qr-color-actions .btn{ flex:1; }
+
   /* ── Co-menu grid ── */
   .co-menu-grid{
     grid-template-columns:repeat(auto-fill,minmax(100px,1fr));
@@ -10867,7 +10889,6 @@ html,body{height:100%;font-family:'Inter',sans-serif;color:var(--text);backgroun
 <!-- ════ ADMIN PASSWORD GATE ════ -->
 <div id="admin-lock" style="position:fixed;inset:0;z-index:9999;background:linear-gradient(135deg,var(--brown),var(--dark));display:flex;align-items:center;justify-content:center;padding:20px">
   <div style="background:var(--cream);border-radius:var(--radius-lg);padding:36px 32px;max-width:360px;width:100%;box-shadow:var(--shadow-lg);text-align:center">
-    <div style="font-size:40px;margin-bottom:6px">🐾</div>
     <div style="font-family:'Playfair Display',serif;font-weight:700;font-size:20px;color:var(--brown);margin-bottom:4px">HEYCAT Admin</div>
     <div style="font-size:13px;color:var(--muted);margin-bottom:22px">Sign in with your admin account</div>
     <input type="email" id="admin-lock-email" class="input-field" placeholder="Email" style="text-align:center;margin-bottom:10px" autocomplete="username">
@@ -10882,7 +10903,6 @@ html,body{height:100%;font-family:'Inter',sans-serif;color:var(--text);backgroun
 <!-- ════ SIDEBAR ════ -->
 <aside id="sidebar">
   <div class="sidebar-logo">
-    <div class="sidebar-logo-paw">🐾</div>
     <div class="sidebar-logo-name">HEYCAT</div>
     <div class="sidebar-logo-sub">ADMIN DASHBOARD</div>
   </div>
@@ -11547,6 +11567,30 @@ html,body{height:100%;font-family:'Inter',sans-serif;color:var(--text);backgroun
         </div>
       </div>
 
+      <!-- ── Customer QR code customization ── -->
+      <div class="card" id="qr-custom-card" style="margin-top:24px;border:2px solid var(--gold-light,#F5C842)">
+        <div class="card-title" style="margin-bottom:4px">🎨 Customize Customer QR Code</div>
+        <div style="font-size:13px;color:var(--muted);margin-bottom:18px">Set the colours of the QR code your customers
+          show in the app. High contrast keeps it easy to scan.</div>
+        <div class="qr-color-row" style="display:flex;gap:24px;align-items:flex-end;flex-wrap:wrap">
+          <label style="font-size:13px;color:var(--muted)">Code colour
+            <input type="color" id="qr-fg-input" value="#000000" oninput="updateQrPreview()"
+              style="display:block;width:60px;height:42px;border:none;background:none;cursor:pointer;margin-top:6px"></label>
+          <label style="font-size:13px;color:var(--muted)">Background
+            <input type="color" id="qr-bg-input" value="#FFFFFF" oninput="updateQrPreview()"
+              style="display:block;width:60px;height:42px;border:none;background:none;cursor:pointer;margin-top:6px"></label>
+          <div id="qr-color-preview"
+            style="width:72px;height:72px;border-radius:12px;border:1px solid var(--border,#ddd);flex-shrink:0"></div>
+          <div class="qr-color-actions" style="display:flex;gap:8px;flex-wrap:wrap;margin-left:auto">
+            <button class="btn btn-ghost" onclick="resetQrColors()">Reset to B/W</button>
+            <button class="btn btn-gold" onclick="saveQrColors()">Save</button>
+          </div>
+        </div>
+        <div id="qr-contrast-warn" style="display:none;font-size:12px;color:#c0392b;margin-top:12px">⚠️ Low contrast — some
+          scanners may fail. Keep a dark code on a light background.</div>
+        <div id="qr-color-status" style="font-size:12px;color:var(--muted);margin-top:10px"></div>
+      </div>
+
     </div>
 
   </div><!-- /content -->
@@ -11731,6 +11775,8 @@ async function loadAllData() {
   populateQuickCustomerDropdown();
   // Load free coffee threshold
   await loadFreeCoffeeThreshold();
+  // Load customer QR code colours
+  loadQrColorSettings();
 
   renderCounterMenuGrid();
 }
@@ -11770,6 +11816,70 @@ async function saveFreeCoffeeThreshold() {
   const msg = document.getElementById('free-coffee-saved-msg');
   if (msg) { msg.style.display = 'inline'; setTimeout(() => msg.style.display = 'none', 2500); }
   toast(`✅ Free coffee threshold set to ${val.toLocaleString()} DA`);
+}
+
+// ════════════════════════════════════════
+// CUSTOMER QR CODE COLOURS
+// Stored in app_settings: qr_fg_color, qr_bg_color
+// ════════════════════════════════════════
+async function loadQrColorSettings() {
+  try {
+    const { data } = await db.from('app_settings')
+      .select('key,value').in('key', ['qr_fg_color', 'qr_bg_color']);
+    const map = {}; (data || []).forEach(r => { map[r.key] = r.value; });
+    const fg = document.getElementById('qr-fg-input');
+    const bg = document.getElementById('qr-bg-input');
+    if (fg) fg.value = map.qr_fg_color || '#000000';
+    if (bg) bg.value = map.qr_bg_color || '#FFFFFF';
+    updateQrPreview();
+  } catch (e) { /* table may not exist yet */ }
+}
+
+// ── contrast helpers, so codes stay scannable ──
+function qrRelLum(hex) {
+  const c = (hex || '#000000').replace('#', '');
+  const r = parseInt(c.slice(0, 2), 16) / 255, g = parseInt(c.slice(2, 4), 16) / 255, b = parseInt(c.slice(4, 6), 16) / 255;
+  const f = v => v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+  return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+}
+function qrContrast(a, b) {
+  const l1 = qrRelLum(a), l2 = qrRelLum(b);
+  return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+}
+
+function updateQrPreview() {
+  const fg = (document.getElementById('qr-fg-input') || {}).value || '#000000';
+  const bg = (document.getElementById('qr-bg-input') || {}).value || '#FFFFFF';
+  const box = document.getElementById('qr-color-preview');
+  if (box) {
+    box.style.background = bg;
+    box.innerHTML = `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px;padding:9px;height:100%;box-sizing:border-box">${
+      [1,0,1,0,1,0,1,0,1].map(v => `<div style="background:${v ? fg : 'transparent'};border-radius:2px"></div>`).join('')
+    }</div>`;
+  }
+  const warn = document.getElementById('qr-contrast-warn');
+  if (warn) warn.style.display = qrContrast(fg, bg) < 3 ? 'block' : 'none';
+}
+
+function resetQrColors() {
+  const fg = document.getElementById('qr-fg-input'), bg = document.getElementById('qr-bg-input');
+  if (fg) fg.value = '#000000';
+  if (bg) bg.value = '#FFFFFF';
+  updateQrPreview();
+}
+
+async function saveQrColors() {
+  const fg = document.getElementById('qr-fg-input').value || '#000000';
+  const bg = document.getElementById('qr-bg-input').value || '#FFFFFF';
+  const status = document.getElementById('qr-color-status');
+  if (qrContrast(fg, bg) < 1.8) { toast('❌ Contrast too low — pick a darker code or a lighter background'); return; }
+  const { error } = await db.from('app_settings').upsert([
+    { key: 'qr_fg_color', value: fg },
+    { key: 'qr_bg_color', value: bg },
+  ], { onConflict: 'key' });
+  if (error) { toast('❌ Error saving: ' + error.message); return; }
+  if (status) { status.textContent = '✅ Saved — customers will see the new colours.'; setTimeout(() => { status.textContent = ''; }, 3000); }
+  toast('✅ QR colours updated');
 }
 
 // ════════════════════════════════════════
@@ -13490,6 +13600,7 @@ function handleCameraScanResult(rawValue) {
   );
 
   if (!c) {
+    scanFeedback(false);
     toast('❌ No matching customer for that QR code');
     // Brief pause so we don't immediately re-trigger on the same frame, then keep scanning
     setTimeout(() => { if (cameraActive) scanRAF = requestAnimationFrame(scanFrameLoop); }, 1200);
@@ -13512,7 +13623,7 @@ function showScanResultFor(c) {
   scanSelection = { customerId: c.id, selectedIds: new Set() };
 
   scanResult.innerHTML = `
-    <div style="text-align:center">
+    <div style="text-align:center;animation:scanResultIn 0.35s ease">
       <div style="font-size:40px;margin-bottom:10px">✅</div>
       <div style="font-size:16px;font-weight:700;color:var(--brown);margin-bottom:6px">${c.name}</div>
       <div style="font-size:12px;color:var(--muted);margin-bottom:12px">${c.email}</div>
@@ -13533,6 +13644,8 @@ function showScanResultFor(c) {
     </div>`;
 
   renderScanMenuGrid();
+  scanFeedback(true);       // buzz + beep + green pulse the instant a customer is matched
+  scrollToScanResult();     // bring the result into view (esp. on phones)
 }
 
 function renderScanMenuGrid() {
@@ -13626,14 +13739,66 @@ async function confirmScanPoints() {
       console.warn('[HEYCAT] Could not notify customer:', e);
     }
 
+    scanFeedback(true);   // celebratory buzz + beep on a completed transaction
     const scanResult = document.getElementById('scan-result');
-    if (scanResult) scanResult.innerHTML = `<div style="padding:20px;text-align:center;color:var(--muted)"><div style="font-size:32px;margin-bottom:8px">🎉</div>✅ +${pts.toLocaleString()} DA added for ${c.name}!<br><span style="font-size:12px">${itemsSummary}</span></div>`;
+    if (scanResult) scanResult.innerHTML = `<div style="padding:20px;text-align:center;color:var(--muted);animation:scanResultIn 0.35s ease"><div style="font-size:36px;margin-bottom:8px">🎉</div><div style="font-size:15px;color:var(--brown);font-weight:700;margin-bottom:4px">+${pts.toLocaleString()} DA added for ${c.name}!</div><span style="font-size:12px">${itemsSummary}</span><button class="btn btn-gold" style="width:100%;margin-top:16px" onclick="scanNextCustomer()">📷 Scan Next Customer</button></div>`;
     toast(`✅ Added ${pts.toLocaleString()} DA to ${c.name}`);
 
   } catch (err) {
     toast('❌ Error: ' + err.message);
     if (btn) { btn.disabled = false; btn.textContent = 'Confirm'; }
   }
+}
+
+// ════════════════════════════════════════
+// SCAN FEEDBACK — makes a scan feel instant & satisfying
+// (haptic buzz + short beep + coloured pulse on the scan box)
+// ════════════════════════════════════════
+function scanFeedback(ok) {
+  // Haptic (phones): quick double-tap on success, one longer buzz on miss
+  try { if (navigator.vibrate) navigator.vibrate(ok ? [15, 40, 15] : 70); } catch (e) {}
+
+  // Short beep via WebAudio — no sound file needed. Allowed because scanning
+  // was started by a user tap (Start Camera / Simulate / Enter Code).
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (AC) {
+      const ctx = scanFeedback._ctx || (scanFeedback._ctx = new AC());
+      if (ctx.state === 'suspended') ctx.resume();
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = 'sine';
+      o.frequency.value = ok ? 880 : 200;
+      g.gain.setValueAtTime(0.0001, ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.22, ctx.currentTime + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.18);
+      o.connect(g); g.connect(ctx.destination);
+      o.start(); o.stop(ctx.currentTime + 0.2);
+    }
+  } catch (e) {}
+
+  // Coloured pulse on the scan frame
+  const box = document.getElementById('scan-box');
+  if (box) {
+    box.classList.remove('scan-hit', 'scan-miss');
+    void box.offsetWidth;                     // restart the animation
+    box.classList.add(ok ? 'scan-hit' : 'scan-miss');
+    setTimeout(() => box.classList.remove('scan-hit', 'scan-miss'), 700);
+  }
+}
+
+// Bring the result into view (handy on phones where it's below the camera)
+function scrollToScanResult() {
+  const card = document.getElementById('scan-result-card');
+  if (card && card.scrollIntoView) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+// One-tap restart for a queue of customers
+function scanNextCustomer() {
+  const scanResult = document.getElementById('scan-result');
+  if (scanResult) scanResult.innerHTML = `<div style="text-align:center;padding:24px 0;color:var(--muted);font-size:13px"><div style="font-size:40px;margin-bottom:10px">📷</div>Ready for the next customer…</div>`;
+  startCameraScan();
+  const box = document.getElementById('scan-box');
+  if (box && box.scrollIntoView) box.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 // ════════════════════════════════════════
@@ -13651,7 +13816,7 @@ function manualCode() {
   if (!code) return;
   const uid = code.replace('HC-','').toLowerCase();
   const c = adminData.customers.find(c => c.id.toLowerCase().startsWith(uid) || c.email.toLowerCase() === uid);
-  if (!c) { toast('❌ Customer not found'); return; }
+  if (!c) { scanFeedback(false); toast('❌ Customer not found'); return; }
   showScanResultFor(c);
   toast('✅ Found: ' + c.name);
 }
