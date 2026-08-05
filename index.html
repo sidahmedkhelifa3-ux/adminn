@@ -10945,7 +10945,12 @@ html,body{height:100%;font-family:'Inter',sans-serif;color:var(--text);backgroun
   --font-display:'Figtree','Inter',sans-serif;
 }
 #wd-screen .wd-hero{background-color:var(--wave-base);background-image:var(--wave-tile);background-size:44px 69px;background-repeat:repeat}
-#wd-screen .wd-light{position:relative;z-index:2;padding:4px 26px 26px;display:flex;flex-direction:column;gap:12px}
+/* Mirrors .splash-light in the app: the panel lifts over the hero as a rounded
+   card, which is what ends the brown now that there is no divider. */
+#wd-screen .wd-light{
+  position:relative;z-index:3;padding:26px 26px 26px;display:flex;flex-direction:column;gap:12px;
+  border-radius:40px 40px 0 0;margin-top:-28px;box-shadow:0 -6px 22px rgba(45,31,14,.20);
+}
 #wd-screen .wd-wave{position:relative;z-index:2;line-height:0}
 #wd-screen .wd-wave svg{display:block;width:100%}
 #wd-screen .wd-i{display:block;height:auto;position:relative;z-index:1}
@@ -11043,6 +11048,9 @@ html,body{height:100%;font-family:'Inter',sans-serif;color:var(--text);backgroun
   <div class="nav-item" onclick="switchPanel('scanner',this)">
     <span class="nav-icon">📷</span> QR Scanner
   </div>
+  <div class="nav-item" onclick="switchPanel('daily',this)">
+    <span class="nav-icon">📣</span> Daily Message
+  </div>
   <div class="nav-item" onclick="switchPanel('welcome',this)">
     <span class="nav-icon">🎨</span> Welcome Designer
   </div>
@@ -11102,6 +11110,9 @@ html,body{height:100%;font-family:'Inter',sans-serif;color:var(--text);backgroun
   </button>
   <button class="mmore-row nav-item" onclick="switchPanel('treats',this);toggleMoreMenu()">
     <span class="nav-icon">🎉</span> Treats
+  </button>
+  <button class="mmore-row nav-item" onclick="switchPanel('daily',this);toggleMoreMenu()">
+    <span class="nav-icon">📣</span> Daily Message
   </button>
   <button class="mmore-row nav-item" onclick="switchPanel('welcome',this);toggleMoreMenu()">
     <span class="nav-icon">🎨</span> Welcome Designer
@@ -11638,8 +11649,8 @@ html,body{height:100%;font-family:'Inter',sans-serif;color:var(--text);backgroun
           Profile facts <span style="color:var(--muted);font-weight:400">— the rows on the cat's page</span>
         </label>
         <div style="font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.6">
-          Leave a line empty and it won't show. Change the emoji in the little box on the left —
-          it's just text, so paste any emoji you like.
+          Leave a line empty and it won't show. Each row is drawn in the app with its own icon —
+          leave the little box on the left empty to use it, or paste an emoji in there to override it.
         </div>
         <div id="cat-fact-fields" style="display:flex;flex-direction:column;gap:10px"></div>
 
@@ -11759,6 +11770,70 @@ html,body{height:100%;font-family:'Inter',sans-serif;color:var(--text);backgroun
         <button class="btn btn-gold" onclick="saveAppTexts()">Save texts</button>
         <button class="btn btn-ghost" onclick="resetAppTexts()">Reset to default</button>
         <span id="apptexts-saved-msg" style="font-size:12px;color:var(--green,#27AE60);display:none">✅ Saved — customers see it on their next launch</span>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         PANEL: DAILY MESSAGE
+         The notification every customer gets once a day. The daily-engagement
+         Edge Function reads this list (app_settings / daily_messages) and picks
+         one per day; with nothing saved here it falls back to the set built
+         into the function, so an empty row never means a silent day.
+    ══════════════════════════════════════ -->
+    <div id="panel-daily" class="panel">
+      <div class="section-title">Daily Message</div>
+      <div class="section-sub">
+        What customers get once a day, at 10:00. The same wording goes out as a phone
+        notification, an email, and the bell inside the app.
+      </div>
+
+      <div class="card" style="max-width:900px;margin-bottom:18px">
+        <label class="wd-check" style="padding-top:0">
+          <input type="checkbox" id="daily-enabled" onchange="renderDailyPanel()">
+          <span style="font-size:14px;font-weight:600;color:var(--text)">Send the daily message</span>
+        </label>
+        <div style="font-size:12px;color:var(--muted);margin-top:8px;line-height:1.6">
+          Turn this off and nothing goes out — the schedule keeps running but skips.
+          Nobody gets a notification until you switch it back on.
+        </div>
+
+        <div style="display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-top:16px;
+                    padding-top:16px;border-top:1px solid var(--border)">
+          <div>
+            <label style="font-size:13px;font-weight:600;color:var(--text);display:block;margin-bottom:6px">
+              Send at
+            </label>
+            <select id="daily-hour" class="input-field" style="width:130px" onchange="renderDailyToday()"></select>
+          </div>
+          <div style="flex:1;min-width:220px;font-size:11.5px;color:var(--muted);line-height:1.6;padding-bottom:4px">
+            Algeria time. It goes out on the hour — pick the hour, and it leaves within
+            that hour. Once a day, whatever happens: if something goes wrong at the
+            chosen hour it isn't retried later that day, and it can never send twice.
+          </div>
+        </div>
+      </div>
+
+      <div id="daily-today" class="card"
+        style="max-width:900px;margin-bottom:18px;border:2px solid var(--gold-light,#F5C842)"></div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px">
+        <div>
+          <div class="wd-zone-name">The messages</div>
+          <div style="font-size:11.5px;color:var(--muted);margin-top:2px">
+            One is used each day, working down the list and starting again at the top —
+            so the same wording only comes round once the whole list has been through.
+          </div>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="addDailyMessage()">+ Add message</button>
+      </div>
+
+      <div id="daily-list" style="display:flex;flex-direction:column;gap:10px;max-width:900px"></div>
+
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:20px">
+        <button class="btn btn-gold" onclick="saveDailyMessages()">Save messages</button>
+        <button class="btn btn-ghost" onclick="resetDailyMessages()">Back to the built-in set</button>
+        <span id="daily-saved-msg" style="font-size:12px;font-weight:600;color:#27AE60;display:none">
+          ✅ Saved — the next daily send uses these</span>
       </div>
     </div>
 
@@ -11899,9 +11974,11 @@ html,body{height:100%;font-family:'Inter',sans-serif;color:var(--text);backgroun
             <label style="font-size:13px;font-weight:600;color:var(--text);display:block;margin-bottom:6px">
               WhatsApp number
             </label>
-            <input type="text" id="wa-number" class="input-field" placeholder="+213 555 12 34 56" style="width:100%">
+            <input type="text" id="wa-number" class="input-field" placeholder="+213 555 12 34 56"
+              onfocus="waSeedPrefix()" style="width:100%">
             <div style="font-size:11px;color:var(--muted);margin-top:4px">
-              Include the country code. Spaces and dashes are fine — they're stripped automatically.
+              Starts on +213 for Algeria — just type the rest. Spaces and dashes are fine, they're
+              stripped automatically. Replace it if the number is in another country.
             </div>
           </div>
           <button class="btn btn-primary" onclick="saveWhatsAppNumber()" style="flex-shrink:0">Save number</button>
@@ -12276,6 +12353,8 @@ async function loadAllData() {
   loadAppTexts();
   // ...and the welcome screen's layout, photo and colours
   loadSplashDesign();
+  // ...and the wording of the once-a-day message
+  loadDailyMessages();
 
   renderCounterMenuGrid();
 }
@@ -12386,6 +12465,231 @@ async function resetAppTexts() {
 }
 
 // ════════════════════════════════════════
+// DAILY MESSAGE
+//
+// The daily-engagement Edge Function sends one message a day — as a phone
+// notification, an email, and a row in the in-app bell — picked from a list by
+// day-of-year so it cycles instead of repeating. That list lives in
+// app_settings / daily_messages, and this panel is what writes it.
+//
+// The function keeps its own built-in set and falls back to it when this row is
+// missing or empty, so a mistake here is a day of the old wording, never a
+// silent day.
+// ════════════════════════════════════════
+
+// Mirrors the set inside the Edge Function, for "back to the built-in set" and
+// so the panel has something to show on a shop that has never touched it.
+const DAILY_BUILTIN = [
+  { title: 'Miss you already! ☕',                    body: 'Your favorite HeyCat blend is waiting. Swing by and treat yourself today!' },
+  { title: 'Rise and grind! 🐾',                      body: 'Mornings are better with HeyCat. Order now and start your day right.' },
+  { title: "Psst... it's coffee o'clock ⏰",           body: "We've saved you a seat (and maybe a pastry). Come say hi!" },
+  { title: 'Your HeyPoints miss you 💰',              body: 'Come earn a few more today — that free drink is closer than you think.' },
+  { title: 'Craving something sweet? 🍰',             body: "Today's the perfect day for your favorite HeyCat treat." },
+  { title: "We haven't seen you in a while 👀",       body: "Come back for a fresh cup — we've got something new brewing." },
+  { title: 'Cats + Coffee = 😻',                      body: 'Need a reason to smile today? A HeyCat coffee always helps.' },
+  { title: 'A little treat never hurts 🎉',           body: 'Drop by today and treat yourself to something delicious.' },
+  { title: 'Your cup is looking a little empty 🥲',   body: "Let's fix that — order your HeyCat favorite now!" },
+  { title: 'New day, new brew 🌞',                    body: "Today's a great day to try something new from our menu." },
+  { title: "Friends don't let friends skip coffee 🐾", body: 'Bring a friend, share some HeyPoints, and enjoy the day together.' },
+  { title: "Treat-yourself o'clock 🎶",               body: "You've had a busy week — a HeyCat coffee is calling your name." },
+  { title: 'Your free drink is getting closer 🎁',    body: 'Every order counts. Order today and inch closer to your reward!' },
+  { title: "We've got a seat with your name on it 🪑", body: 'Come warm up with your favorite HeyCat cup.' },
+];
+
+let dailyMessages = [];
+let dailyEnabled  = true;
+let dailyHour     = 10;   // Algeria time. 10:00 is where the schedule started.
+
+// The shop is in Algiers, so "today" and "what time is it" have to be answered
+// there, not in the browser's timezone or the server's. Both this panel and the
+// Edge Function use these, so the preview cannot drift from what is sent.
+const DAILY_TZ = 'Africa/Algiers';
+
+function dailyLocalDate() {
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
+    timeZone: DAILY_TZ, year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(new Date()).map(x => [x.type, x.value]));
+  return `${p.year}-${p.month}-${p.day}`;
+}
+
+// Which one goes out today. Must match pickTodaysMessage() in the Edge Function
+// exactly, or the panel would preview a different message from the one
+// customers actually receive.
+function dailyIndexForToday(count) {
+  if (!count) return 0;
+  const [y, m, d] = dailyLocalDate().split('-').map(Number);
+  const dayOfYear = Math.floor((Date.UTC(y, m - 1, d) - Date.UTC(y, 0, 1)) / 86400000);
+  return dayOfYear % count;
+}
+
+function renderDailyHourOptions() {
+  const sel = document.getElementById('daily-hour');
+  if (!sel || sel.options.length) return;
+  let html = '';
+  for (let h = 0; h < 24; h++) {
+    const label = String(h).padStart(2, '0') + ':00';
+    html += `<option value="${h}">${label}</option>`;
+  }
+  sel.innerHTML = html;
+}
+
+async function loadDailyMessages() {
+  let saved = null;
+  try {
+    const { data, error } = await db.from('app_settings')
+      .select('value').eq('key', 'daily_messages').maybeSingle();
+    if (!error && data && data.value) saved = JSON.parse(data.value);
+  } catch (e) {
+    console.warn('[HEYCAT ADMIN] could not read daily_messages:', e);
+  }
+
+  const list = saved && Array.isArray(saved.messages)
+    ? saved.messages.filter(m => m && (m.title || m.body))
+    : null;
+  dailyMessages = list && list.length
+    ? list.map(m => ({ title: m.title || '', body: m.body || '' }))
+    : DAILY_BUILTIN.map(m => ({ ...m }));
+  dailyEnabled = !saved || saved.enabled !== false;
+  // A row written before the hour was configurable keeps the 10:00 it was
+  // already going out at, rather than silently jumping to midnight.
+  const h = saved && Number(saved.hour);
+  dailyHour = Number.isInteger(h) && h >= 0 && h <= 23 ? h : 10;
+
+  if (currentPanelName === 'daily') renderDailyPanel();
+}
+
+function setDailyMessage(i, field, value) {
+  if (dailyMessages[i]) dailyMessages[i][field] = value;
+  renderDailyToday();
+}
+
+function addDailyMessage() {
+  dailyMessages.push({ title: '', body: '' });
+  renderDailyPanel();
+}
+
+function removeDailyMessage(i) {
+  const m = dailyMessages[i];
+  if ((m.title || m.body) && !confirm('Remove this message from the daily rotation?')) return;
+  dailyMessages.splice(i, 1);
+  renderDailyPanel();
+}
+
+function moveDailyMessage(i, dir) {
+  const to = i + dir;
+  if (to < 0 || to >= dailyMessages.length) return;
+  dailyMessages.splice(to, 0, dailyMessages.splice(i, 1)[0]);
+  renderDailyPanel();
+}
+
+function renderDailyToday() {
+  const host = document.getElementById('daily-today');
+  if (!host) return;
+  const usable = dailyMessages.filter(m => m.title.trim() && m.body.trim());
+  const on = document.getElementById('daily-enabled')?.checked;
+  const hour = Number(document.getElementById('daily-hour')?.value ?? dailyHour);
+  const at = String(hour).padStart(2, '0') + ':00';
+
+  if (!on) {
+    host.innerHTML = '<div class="card-title" style="margin-bottom:4px">⏸ Paused</div>' +
+      '<div style="font-size:13px;color:var(--muted)">Nothing is going out. ' +
+      'Tick "Send the daily message" above to start again.</div>';
+    return;
+  }
+  if (!usable.length) {
+    host.innerHTML = '<div class="card-title" style="margin-bottom:4px">Nothing written yet</div>' +
+      '<div style="font-size:13px;color:var(--muted)">With no messages saved the app falls back ' +
+      'to its own built-in set, so customers still hear from you.</div>';
+    return;
+  }
+  const pick = usable[dailyIndexForToday(usable.length)];
+  host.innerHTML =
+    '<div class="card-title" style="margin-bottom:10px">📣 Going out today, at ' + at + '</div>' +
+    '<div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px 16px;max-width:420px">' +
+      '<div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px">' + escHtml(pick.title) + '</div>' +
+      '<div style="font-size:13px;color:var(--muted);line-height:1.5">' + escHtml(pick.body) + '</div>' +
+    '</div>' +
+    '<div style="font-size:11.5px;color:var(--muted);margin-top:10px">' +
+      'Number ' + (dailyIndexForToday(usable.length) + 1) + ' of ' + usable.length +
+      ' — tomorrow moves on to the next one.</div>';
+}
+
+function renderDailyPanel() {
+  const list = document.getElementById('daily-list');
+  const onBox = document.getElementById('daily-enabled');
+  if (!list) return;
+  if (onBox && onBox.dataset.bound !== '1') { onBox.checked = dailyEnabled; onBox.dataset.bound = '1'; }
+  renderDailyHourOptions();
+  const hourBox = document.getElementById('daily-hour');
+  if (hourBox && hourBox.dataset.bound !== '1') { hourBox.value = String(dailyHour); hourBox.dataset.bound = '1'; }
+
+  list.innerHTML = dailyMessages.length
+    ? dailyMessages.map((m, i) => `
+      <div class="card" style="padding:14px 16px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+          <span style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.5px">DAY ${i + 1}</span>
+          <div style="flex:1"></div>
+          <button class="wd-mini" title="Move up" onclick="moveDailyMessage(${i},-1)" ${i === 0 ? 'disabled' : ''}>↑</button>
+          <button class="wd-mini" title="Move down" onclick="moveDailyMessage(${i},1)" ${i === dailyMessages.length - 1 ? 'disabled' : ''}>↓</button>
+          <button class="wd-mini wd-danger" title="Remove" onclick="removeDailyMessage(${i})">✕</button>
+        </div>
+        <input type="text" class="input-field" value="${escAttr(m.title)}" maxlength="80"
+          placeholder="Headline — e.g. Miss you already! ☕"
+          oninput="setDailyMessage(${i},'title',this.value)" style="width:100%;margin-bottom:8px;font-weight:600">
+        <textarea class="input-field" rows="2" maxlength="200"
+          placeholder="The line underneath — e.g. Your favourite blend is waiting."
+          oninput="setDailyMessage(${i},'body',this.value)"
+          style="width:100%;resize:vertical">${escHtml(m.body)}</textarea>
+      </div>`).join('')
+    : `<div style="font-size:13px;color:var(--muted);font-style:italic;padding:18px;
+         border:1.5px dashed var(--border);border-radius:12px;text-align:center">
+         No messages. Add one, or use "Back to the built-in set".</div>`;
+
+  renderDailyToday();
+}
+
+async function saveDailyMessages() {
+  const clean = dailyMessages
+    .map(m => ({ title: (m.title || '').trim(), body: (m.body || '').trim() }))
+    .filter(m => m.title && m.body);
+
+  if (dailyMessages.length && !clean.length) {
+    toast('❌ Every message needs both a headline and a line underneath');
+    return;
+  }
+
+  const hour = Number(document.getElementById('daily-hour')?.value);
+  const payload = {
+    enabled: !!document.getElementById('daily-enabled')?.checked,
+    hour: Number.isInteger(hour) && hour >= 0 && hour <= 23 ? hour : 10,
+    messages: clean,
+  };
+  const { error } = await db.from('app_settings')
+    .upsert({ key: 'daily_messages', value: JSON.stringify(payload) }, { onConflict: 'key' });
+  if (error) { toast('❌ Error saving: ' + error.message); return; }
+
+  dailyMessages = clean.map(m => ({ ...m }));
+  dailyEnabled = payload.enabled;
+  dailyHour = payload.hour;
+  renderDailyPanel();
+
+  const msg = document.getElementById('daily-saved-msg');
+  if (msg) { msg.style.display = 'inline'; setTimeout(() => msg.style.display = 'none', 4000); }
+  const dropped = dailyMessages.length !== clean.length;
+  toast('✅ Daily messages saved' + (dropped ? ' (incomplete ones were left out)' : ''));
+}
+
+async function resetDailyMessages() {
+  if (!confirm('Replace what is here with the set built into the app?')) return;
+  dailyMessages = DAILY_BUILTIN.map(m => ({ ...m }));
+  const onBox = document.getElementById('daily-enabled');
+  if (onBox) onBox.checked = true;
+  // The send time is the shop's choice, not part of the wording — leave it be.
+  renderDailyPanel();
+  toast('↩️ Back to the built-in set — press Save to keep it');
+}
+
+// ════════════════════════════════════════
 // WELCOME DESIGNER — the customer app's first screen
 //
 // One JSON row in app_settings (key: splash_layout): a theme object plus two
@@ -12420,11 +12724,26 @@ const WD_I18N = {
   },
 };
 
+// Every shape is symmetric about the centre line, so the divider never reads
+// heavier on one side than the other. Keep in step with SD_WAVE_PATHS in the
+// customer app — the app renders from its own copy.
 const WD_WAVE_PATHS = {
-  soft:     'M0,52 C180,120 300,152 480,138 C660,124 760,38 940,54 C1120,70 1280,150 1440,96 L1440,200 L0,200 Z',
-  deep:     'M0,20 C240,180 420,190 720,120 C1020,50 1200,10 1440,80 L1440,200 L0,200 Z',
-  gentle:   'M0,120 C360,150 720,150 1080,120 C1260,105 1350,100 1440,110 L1440,200 L0,200 Z',
-  straight: 'M0,150 L1440,150 L1440,200 L0,200 Z',
+  // ── single curves ──
+  soft:     'M0,40 C300,40 450,160 720,160 C990,160 1140,40 1440,40 L1440,200 L0,200 Z',
+  deep:     'M0,10 C300,10 450,185 720,185 C990,185 1140,10 1440,10 L1440,200 L0,200 Z',
+  gentle:   'M0,80 C300,80 450,135 720,135 C990,135 1140,80 1440,80 L1440,200 L0,200 Z',
+  arch:     'M0,160 C300,160 450,40 720,40 C990,40 1140,160 1440,160 L1440,200 L0,200 Z',
+  wave:     'M0,100 C180,35 540,35 720,100 C900,165 1260,165 1440,100 L1440,200 L0,200 Z',
+  // ── repeating ──
+  twin:     'M0,70 C180,70 180,150 360,150 C540,150 540,70 720,70 C900,70 900,150 1080,150 C1260,150 1260,70 1440,70 L1440,200 L0,200 Z',
+  triple:   'M0,70 C120,70 120,140 240,140 C360,140 360,70 480,70 C600,70 600,140 720,140 C840,140 840,70 960,70 C1080,70 1080,140 1200,140 C1320,140 1320,70 1440,70 L1440,200 L0,200 Z',
+  // Cusps between the arcs are the point of this one — a scalloped edge.
+  scallop:  'M0,125 C60,52 180,52 240,125 C300,52 420,52 480,125 C540,52 660,52 720,125 C780,52 900,52 960,125 C1020,52 1140,52 1200,125 C1260,52 1380,52 1440,125 L1440,200 L0,200 Z',
+  // ── shaped around a centred cup ──
+  dome:     'M0,150 L440,150 C560,150 560,55 720,55 C880,55 880,150 1000,150 L1440,150 L1440,200 L0,200 Z',
+  ears:     'M0,150 L470,150 C540,150 550,60 600,60 C650,60 660,150 720,150 C780,150 790,60 840,60 C890,60 900,150 970,150 L1440,150 L1440,200 L0,200 Z',
+  foam:     'M0,110 C90,110 90,70 180,70 C270,70 250,130 360,130 C470,130 450,60 560,60 C670,60 650,120 720,120 C790,120 770,60 880,60 C990,60 970,130 1080,130 C1190,130 1170,70 1260,70 C1350,70 1350,110 1440,110 L1440,200 L0,200 Z',
+  straight: 'M0,120 L1440,120 L1440,200 L0,200 Z',
 };
 
 const WD_BLOCK_META = {
@@ -12453,7 +12772,10 @@ function wdDefaultDesign() {
     v: 1,
     theme: {
       pageBg:'#FBF8F4', heroBg:'#543523', heroTexture:true, lightBg:'#FFFFFF',
-      waveOn:true, waveShape:'soft', waveHeight:78, waveColor:'',
+      // Off, matching the app: the light panel now ends the hero itself, as a
+      // rounded card lifting over it. Every wave shape put its movement in the
+      // middle, where the centred cup covered it.
+      waveOn:false, waveShape:'twin', waveHeight:78, waveColor:'',
     },
     hero: [
       { id:wdId(), type:'topbar', on:true, lang:true, menu:true, ink:'#FFFFFF' },
@@ -12461,7 +12783,9 @@ function wdDefaultDesign() {
         style:{ size:36, weight:900, color:'#FFFFFF', align:'center', caps:true, font:'display', mt:20, mb:0 } },
       { id:wdId(), type:'text', on:true, i18nKey:'splashHeadline2', text:{en:'',ar:''},
         style:{ size:29, weight:900, color:'#E8B84B', align:'center', caps:true, font:'display', mt:2, mb:0 } },
-      { id:wdId(), type:'image', on:true, src:'', width:62, maxWidth:188, mt:16, overlap:88, radius:0 },
+      // overlap 0: the light panel lifts itself over the cup's base, so nothing
+      // here has to be tuned against a divider.
+      { id:wdId(), type:'image', on:true, src:'', width:62, maxWidth:188, mt:16, overlap:0, radius:0 },
     ],
     body: [
       { id:wdId(), type:'text', on:true, i18nKey:'splashRewardLabel', text:{en:'',ar:''},
@@ -12770,7 +13094,19 @@ function wdRenderTheme() {
   const host = document.getElementById('wd-theme-fields');
   if (!host || !wdDesign) return;
   const th = wdDesign.theme;
-  const shapes = [['soft','Soft curve'],['deep','Deep curve'],['gentle','Gentle dip'],['straight','Straight edge']];
+  // Ordered by how much of each shape is actually on show. The cup is centred
+  // and the wave is drawn over it, so anything happening in the middle is
+  // hidden — the ones at the bottom are shaped almost entirely there and come
+  // out looking like a straight edge on this screen.
+  const shapes = [
+    ['wave','S-wave'], ['twin','Double wave'], ['triple','Triple wave'],
+    ['deep','Deep dip'], ['foam','Milk foam'], ['scallop','Scalloped'],
+    ['soft','Soft dip'], ['arch','Arch'],
+    ['gentle','Shallow dip — barely shows'],
+    ['dome','Dome — hidden behind the cup'],
+    ['ears','Cat ears — hidden behind the cup'],
+    ['straight','Straight edge'],
+  ];
   host.innerHTML =
     wdField('Hero background', '<input type="color" value="' + wdHex(th.heroBg,'#543523') +
       '" oninput="wdSetTheme(\'heroBg\',this.value)">') +
@@ -13052,7 +13388,8 @@ function wdRenderPreview() {
   host.innerHTML =
     '<div class="wd-hero" style="position:relative;overflow:hidden' +
       (th.heroBg ? ';background-color:' + th.heroBg : '') +
-      (th.heroTexture === false ? ';background-image:none' : '') + '">' +
+      (th.heroTexture === false ? ';background-image:none'
+                                : ';background-image:var(--wave-tile)') + '">' +
       wdDesign.hero.map(b => wdPreviewBlock(b, 'hero')).join('') + waveHTML +
     '</div>' +
     '<div class="wd-light" style="background:' + wdEsc(lightBg) + '">' +
@@ -13240,7 +13577,7 @@ function toggleMoreMenu() {
 const panelTitles = {
   overview:'Overview', giftcards:'Gift Cards', homeposts:'Home Posts', treats:'Treats / Offers',
   cats:'Cats', rewards:'Rewards', customers:'Customers', scanner:'QR Scanner', support:'Support',
-  apptexts:'App Texts', welcome:'Welcome Designer'
+  apptexts:'App Texts', welcome:'Welcome Designer', daily:'Daily Message'
 };
 const panelSubs = {
   overview:"Here's what's happening today",
@@ -13253,7 +13590,8 @@ const panelSubs = {
   scanner:'Scan customer QR to add points',
   support:'Problem reports submitted by customers',
   apptexts:'Wording on the customer welcome screen',
-  welcome:'Design the first screen customers see'
+  welcome:'Design the first screen customers see',
+  daily:'The message every customer gets once a day'
 };
 
 function switchPanel(name, clickedEl) {
@@ -13290,6 +13628,7 @@ function renderCurrentPanel() {
   if (currentPanelName === 'rewards')      { renderRewardsTable(); renderTiersTable(); }
   if (currentPanelName === 'support')      renderSupportTable();
   if (currentPanelName === 'welcome')      renderWelcomeDesigner();
+  if (currentPanelName === 'daily')        renderDailyPanel();
 }
 
 // ════════════════════════════════════════
@@ -13986,19 +14325,38 @@ function filterMenuCat(c)   { renderMenuTable(); }
 // it as part of the country code and opens a chat with nobody, so strip it.
 function waDigits(num) { return String(num || '').replace(/[^0-9]/g, '').replace(/^00/, ''); }
 
+// The shop is in Algeria, so the field starts on its dialling code rather than
+// empty — the commonest mistake here was typing the local 0555… form, which
+// wa.me accepts and then opens a chat with nobody.
+const WA_PREFIX = '+213 ';
+const WA_PREFIX_DIGITS = waDigits(WA_PREFIX);
+
+// Put it back whenever the box is left empty, so clearing the number doesn't
+// mean typing the code again.
+function waSeedPrefix() {
+  const el = document.getElementById('wa-number');
+  if (el && !el.value.trim()) el.value = WA_PREFIX;
+}
+
 async function loadWhatsAppNumber() {
   try {
     const { data } = await db.from('app_settings')
       .select('value').eq('key', 'whatsapp_number').maybeSingle();
     const el = document.getElementById('wa-number');
     if (el && data && data.value) el.value = data.value;
-  } catch (e) { /* field just stays blank */ }
+  } catch (e) { /* falls through to the prefix below */ }
+  waSeedPrefix();
 }
 
 async function saveWhatsAppNumber() {
   const el  = document.getElementById('wa-number');
-  const raw = (el?.value || '').trim();
-  const digits = waDigits(raw);
+  let raw = (el?.value || '').trim();
+  let digits = waDigits(raw);
+
+  // The box is seeded with the dialling code, so "just the code" is what an
+  // empty field now looks like — treat it as clearing the number rather than
+  // as a number too short to work.
+  if (digits === WA_PREFIX_DIGITS) { raw = ''; digits = ''; }
 
   // A local number without a country code silently fails on wa.me — it opens
   // WhatsApp on a contact that doesn't exist. Catch both shapes here instead of
@@ -14021,14 +14379,15 @@ async function saveWhatsAppNumber() {
     msg.style.display = 'block';
     setTimeout(() => { msg.style.display = 'none'; }, 5000);
   }
-  toast('✅ WhatsApp number saved');
+  if (!raw) waSeedPrefix();   // cleared: leave the code ready for the next one
+  toast(raw ? '✅ WhatsApp number saved' : '✅ WhatsApp number cleared');
 }
 
 // Opens the same link a customer would get, so the number can be checked
 // before anyone relies on it.
 function testWhatsAppNumber() {
   const digits = waDigits(document.getElementById('wa-number')?.value);
-  if (!digits) { toast('Enter a number first'); return; }
+  if (!digits || digits === WA_PREFIX_DIGITS) { toast('Enter a number first'); return; }
   const text = 'Test message from the HEY CAT dashboard — if you can read this, the Help button works.';
   window.open(`https://wa.me/${digits}?text=${encodeURIComponent(text)}`, '_blank');
 }
@@ -14219,15 +14578,18 @@ function addCatTrait(trait) {
 // The rows on a cat's page in the customer app, in the order they appear there.
 // Each one is optional, and each carries an emoji the dashboard can replace.
 // Keep this list in step with CAT_FACT_FIELDS in the customer app.
+// Each row is drawn in the app with a line icon, the same family as the ones
+// down its settings sheet. The emoji box beside each field is an override: fill
+// it in and that row shows the emoji instead of the drawn icon.
 const CAT_FACT_FIELDS = [
-  { key:'color',       icon:'🎨',  label:'Colour',          ph:'e.g. Rich chocolate 🍫' },
-  { key:'personality', icon:'💛',  label:'Personality',     ph:'e.g. Tender, calm & loves attention' },
-  { key:'loves',       icon:'😻',  label:'Loves',           ph:'e.g. Treats, cozy naps & warm spots' },
-  { key:'vibes',       icon:'😎',  label:'Vibes',           ph:'e.g. Cool, chill & a little mysterious' },
-  { key:'spot',        icon:'📍',  label:'Favourite spot',  ph:'e.g. The window sofa' },
-  { key:'treat',       icon:'🍽️', label:'Favourite treat', ph:'e.g. Warm milk foam' },
-  { key:'bestfriend',  icon:'🐾',  label:'Best friend',     ph:'e.g. Shadow' },
-  { key:'funfact',     icon:'🔍',  label:'Fun fact',        ph:'e.g. Will quietly investigate everything' },
+  { key:'color',       label:'Colour',          ph:'e.g. Rich chocolate' },
+  { key:'personality', label:'Personality',     ph:'e.g. Tender, calm & loves attention' },
+  { key:'loves',       label:'Loves',           ph:'e.g. Treats, cozy naps & warm spots' },
+  { key:'vibes',       label:'Vibes',           ph:'e.g. Cool, chill & a little mysterious' },
+  { key:'spot',        label:'Favourite spot',  ph:'e.g. The window sofa' },
+  { key:'treat',       label:'Favourite treat', ph:'e.g. Warm milk foam' },
+  { key:'bestfriend',  label:'Best friend',     ph:'e.g. Shadow' },
+  { key:'funfact',     label:'Fun fact',        ph:'e.g. Will quietly investigate everything' },
 ];
 
 let catCustomFacts = [];   // the extra rows on the cat being edited
@@ -14256,8 +14618,9 @@ function renderCatFactFields() {
   if (!host || host.children.length) return;
   host.innerHTML = CAT_FACT_FIELDS.map(f => `
     <div style="display:flex;gap:8px;align-items:flex-end">
-      <input type="text" class="input-field" id="cat-icon-${f.key}" maxlength="4" title="Emoji for this row"
-        style="width:54px;flex-shrink:0;text-align:center;padding-left:4px;padding-right:4px">
+      <input type="text" class="input-field" id="cat-icon-${f.key}" maxlength="4" placeholder="icon"
+        title="Leave empty to use the app's built-in icon for this row, or paste an emoji to override it"
+        style="width:54px;flex-shrink:0;text-align:center;padding-left:4px;padding-right:4px;font-size:12px">
       <div style="flex:1;min-width:0">
         <label style="font-size:12px;font-weight:600;color:var(--text);display:block;margin-bottom:4px">${escHtml(f.label)}</label>
         <input type="text" class="input-field" id="cat-fact-${f.key}" placeholder="${escAttr(f.ph)}" style="width:100%">
@@ -14318,7 +14681,7 @@ function fillCatFactFields(cat) {
     const val  = document.getElementById('cat-fact-' + f.key);
     const icon = document.getElementById('cat-icon-' + f.key);
     if (val)  val.value = (cat && cat[f.key]) || '';
-    if (icon) { icon.value = icons[f.key] || ''; icon.placeholder = f.icon; }
+    if (icon) icon.value = icons[f.key] || '';
   });
   const gIcon = document.getElementById('cat-gender-icon');
   if (gIcon) gIcon.value = icons.gender || '';
@@ -14333,8 +14696,10 @@ function readCatFactFields() {
   const out = { icons: {}, facts: [] };
   CAT_FACT_FIELDS.forEach(f => {
     out[f.key] = (document.getElementById('cat-fact-' + f.key)?.value || '').trim();
+    // Anything typed here is an override; empty means "use the drawn icon", so
+    // nothing is stored and a future change to the icon set reaches this cat.
     const icon = (document.getElementById('cat-icon-' + f.key)?.value || '').trim();
-    if (icon && icon !== f.icon) out.icons[f.key] = icon;
+    if (icon) out.icons[f.key] = icon;
   });
   const gIcon = (document.getElementById('cat-gender-icon')?.value || '').trim();
   if (gIcon) out.icons.gender = gIcon;
