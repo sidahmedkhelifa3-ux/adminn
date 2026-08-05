@@ -12566,6 +12566,17 @@ function setDailyMessage(i, field, value) {
 function addDailyMessage() {
   dailyMessages.push({ title: '', body: '' });
   renderDailyPanel();
+
+  // The new row goes on the end, and the button that adds it is above a list
+  // that is a screenful or more long — so without this the click looks like it
+  // did nothing at all. Bring it into view and put the cursor in it.
+  const rows = document.querySelectorAll('#daily-list .card');
+  const last = rows[rows.length - 1];
+  if (!last) return;
+  try { last.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+  catch { last.scrollIntoView(); }
+  const first = last.querySelector('input[type=text]');
+  if (first) first.focus();
 }
 
 function removeDailyMessage(i) {
