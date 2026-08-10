@@ -12055,6 +12055,12 @@ html,body{height:100%;font-family:'Inter',sans-serif;color:var(--text);backgroun
               No scan yet — use the demo button to try it out
             </div>
           </div>
+          <!-- Fix the last amount added — filled by renderLastAwardCard(),
+               hidden until there is something to correct. -->
+          <div class="card" id="last-award-card" style="display:none">
+            <div class="card-title" style="margin-bottom:14px">Last Amount Added</div>
+            <div id="last-award-body"></div>
+          </div>
           <div class="card">
             <div class="card-title" style="margin-bottom:14px">Quick Amount Add</div>
             <div class="input-group">
@@ -16032,9 +16038,9 @@ async function confirmScanPoints() {
     const { error } = await db.from('profiles').update({ points: newPts, tier: newTier, drink_progress: newDrinkProgress }).eq('id', customerId);
     if (error) throw error;
 
-    const { error: historyErr } = await db.from('points_history').insert({
+    const { data: historyRow, error: historyErr } = await db.from('points_history').insert({
       customer_id: customerId, type:'earn', description: itemsSummary, pts
-    });
+    }).select().single();
     if (historyErr) throw historyErr;
 
     // Update local state instantly
@@ -16068,6 +16074,8 @@ async function confirmScanPoints() {
     const scanResult = document.getElementById('scan-result');
     if (scanResult) scanResult.innerHTML = `<div style="padding:20px;text-align:center;color:var(--muted);animation:scanResultIn 0.35s ease"><div style="font-size:36px;margin-bottom:8px">🎉</div><div style="font-size:15px;color:var(--brown);font-weight:700;margin-bottom:4px">+${pts.toLocaleString()} DA added for ${c.name}!</div><span style="font-size:12px">${itemsSummary}</span><button class="btn btn-gold" style="width:100%;margin-top:16px" onclick="scanNextCustomer()">📷 Scan Next Customer</button></div>`;
     toast(`✅ Added ${pts.toLocaleString()} DA to ${c.name}`);
+    // Remembered so a miskeyed amount can be fixed without editing the customer
+    recordLastAward(historyRow && historyRow.id, customerId, c.name, pts, itemsSummary);
 
   } catch (err) {
     toast('❌ Error: ' + err.message);
@@ -16198,7 +16206,7 @@ async function addBonusPoints(customerId, name, ptsOverride) {
   const newDrinkProgress = (c.drink_progress||0) + pts;
   const { error } = await db.from('profiles').update({ points: newPts, tier: newTier, drink_progress: newDrinkProgress }).eq('id', customerId);
   if (error) { toast('Error: ' + error.message); return; }
-  await db.from('points_history').insert({ customer_id: customerId, type:'earn', description:'Admin bonus', pts });
+  const { data: historyRow } = await db.from('points_history').insert({ customer_id: customerId, type:'earn', description:'Admin bonus', pts }).select().single();
   c.points = newPts; c.tier = newTier; c.drink_progress = newDrinkProgress;
   populateQuickCustomerDropdown();
   renderCustomersTable();
@@ -16206,6 +16214,7 @@ async function addBonusPoints(customerId, name, ptsOverride) {
   const qp = document.getElementById('quick-pts');
   if (qp) qp.value = '';
   toast(`✅ Added ${pts.toLocaleString()} DA to ${name}`);
+  recordLastAward(historyRow && historyRow.id, customerId, name, pts, 'Admin bonus');
 }
 
 // Manually reset a customer's free-drink progress bar to 0.
@@ -16228,6 +16237,158 @@ async function redeemFreeDrink(customerId, name) {
   renderCustomersTable();
   toast(`🎁 Free drink redeemed for ${name} — progress reset to 0`);
 }
+
+// ════════════════════════════════════════
+// FIX THE LAST AMOUNT ADDED
+// A miskeyed amount at the counter used to mean opening the customer and doing
+// the arithmetic by hand. The last award — from a scan or from Quick Amount Add
+// — is remembered here so it can be re-typed or removed outright, with points,
+// tier, free-drink progress and the customer's own history all moving together.
+// ════════════════════════════════════════
+const LAST_AWARD_KEY = 'heycat-last-award';
+const LAST_AWARD_TTL = 2 * 60 * 60 * 1000;   // a shift's grace, not forever
+let lastAward = null;
+
+function loadLastAward() {
+  try {
+    const raw = localStorage.getItem(LAST_AWARD_KEY);
+    if (!raw) return null;
+    const a = JSON.parse(raw);
+    // An old entry is worse than none: the customer has likely been served
+    // again since, and "undo the last one" would no longer mean what it says.
+    if (!a || !a.at || Date.now() - a.at > LAST_AWARD_TTL) return null;
+    return a;
+  } catch (e) { return null; }
+}
+
+function recordLastAward(historyId, customerId, customerName, pts, description) {
+  lastAward = { historyId, customerId, customerName, pts, description, at: Date.now() };
+  try { localStorage.setItem(LAST_AWARD_KEY, JSON.stringify(lastAward)); } catch (e) {}
+  renderLastAwardCard();
+}
+
+function clearLastAward() {
+  lastAward = null;
+  try { localStorage.removeItem(LAST_AWARD_KEY); } catch (e) {}
+  renderLastAwardCard();
+}
+
+function renderLastAwardCard() {
+  const card = document.getElementById('last-award-card');
+  if (!card) return;
+  if (!lastAward) lastAward = loadLastAward();
+  if (!lastAward) { card.style.display = 'none'; return; }
+  card.style.display = '';
+  const when = new Date(lastAward.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  document.getElementById('last-award-body').innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+      <div style="min-width:0">
+        <div style="font-weight:700;color:var(--brown)">+${Number(lastAward.pts).toLocaleString()} DA — ${escapeHtml(lastAward.customerName)}</div>
+        <div style="font-size:12px;color:var(--muted)">${escapeHtml(lastAward.description)} · ${when}</div>
+      </div>
+      <button class="btn btn-ghost" style="flex-shrink:0" onclick="openFixLastAward()">✏️ Fix this</button>
+    </div>`;
+}
+
+function openFixLastAward() {
+  if (!lastAward) return;
+  document.getElementById('last-award-body').innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="font-size:12px;color:var(--muted)">
+        Correcting <b>${escapeHtml(lastAward.customerName)}</b> — entered as
+        ${Number(lastAward.pts).toLocaleString()} DA
+      </div>
+      <input class="input-field" type="number" min="0" id="fix-award-amount" value="${Number(lastAward.pts)}">
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-primary" style="flex:1" onclick="saveFixLastAward()">Save new amount</button>
+        <button class="btn btn-ghost" onclick="undoLastAward()">🗑 Remove</button>
+        <button class="btn btn-ghost" onclick="renderLastAwardCard()">Cancel</button>
+      </div>
+    </div>`;
+  const input = document.getElementById('fix-award-amount');
+  if (input) { input.focus(); input.select(); }
+}
+
+function saveFixLastAward() {
+  const v = parseInt(document.getElementById('fix-award-amount')?.value, 10);
+  if (isNaN(v) || v < 0) { toast('Enter a valid amount'); return; }
+  applyAwardCorrection(v);
+}
+
+function undoLastAward() {
+  if (!lastAward) return;
+  if (!confirm(`Remove the ${Number(lastAward.pts).toLocaleString()} DA added to ${lastAward.customerName}?\n\nTheir points, tier and free-drink progress all go back.`)) return;
+  applyAwardCorrection(0);
+}
+
+// newPts of 0 means the entry was a mistake outright and gets deleted.
+async function applyAwardCorrection(newPts) {
+  if (!lastAward) return;
+  const a = lastAward;
+  const delta = newPts - a.pts;
+  if (delta === 0) { renderLastAwardCard(); return; }
+
+  // Read the customer fresh rather than trusting the cached row: they may have
+  // been served again since, and the correction has to move the current numbers.
+  const { data: cur, error: readErr } = await db.from('profiles')
+    .select('points, drink_progress').eq('id', a.customerId).single();
+  if (readErr) { toast('❌ Error: ' + readErr.message); return; }
+
+  const points = Math.max(0, (cur.points || 0) + delta);
+  const drink  = Math.max(0, (cur.drink_progress || 0) + delta);
+  const tier   = calculateTier(points);
+
+  const { error } = await db.from('profiles')
+    .update({ points, tier, drink_progress: drink }).eq('id', a.customerId);
+  if (error) { toast('❌ Error: ' + error.message); return; }
+
+  // Keep the customer's own history honest — they can see this list in the app.
+  if (a.historyId) {
+    if (newPts === 0) {
+      await db.from('points_history').delete().eq('id', a.historyId);
+    } else {
+      await db.from('points_history')
+        .update({ pts: newPts, description: a.description + ' (corrected)' })
+        .eq('id', a.historyId);
+    }
+  }
+
+  const c = adminData.customers.find(x => x.id === a.customerId);
+  if (c) { c.points = points; c.tier = tier; c.drink_progress = drink; }
+  populateQuickCustomerDropdown();
+  renderCustomersTable();
+
+  // They were already told they earned the wrong amount, so say it changed.
+  // Points quietly disappearing is how a loyalty app loses someone's trust.
+  const title = newPts === 0 ? '↩️ Entry removed' : '✏️ Amount corrected';
+  const body  = newPts === 0
+    ? `The ${Number(a.pts).toLocaleString()} DA added earlier was entered by mistake and has been removed.`
+    : `Your last entry was corrected from ${Number(a.pts).toLocaleString()} DA to ${Number(newPts).toLocaleString()} DA.`;
+  try {
+    await db.from('notifications').insert({ customer_id: a.customerId, icon: '✏️', title, body });
+    const { data: { session } } = await db.auth.getSession();
+    const token = session?.access_token;
+    await fetch(`${SUPABASE_URL}/functions/v1/send-push`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token || SUPABASE_KEY}` },
+      body: JSON.stringify({ title, body, icon: '✏️', customer_id: a.customerId }),
+    });
+  } catch (e) {
+    // A failed notification must not undo a correction that already landed
+    console.warn('[HEYCAT] Could not notify about the correction:', e);
+  }
+
+  if (newPts === 0) {
+    clearLastAward();
+    toast('↩️ Entry removed');
+  } else {
+    recordLastAward(a.historyId, a.customerId, a.customerName, newPts, a.description);
+    toast(`✅ Corrected to ${Number(newPts).toLocaleString()} DA`);
+  }
+}
+
+// Survives a refresh, so a mistake spotted after reloading is still fixable.
+window.addEventListener('load', renderLastAwardCard);
 
 // ════════════════════════════════════════
 // COUNTER ORDER (Points Calculator)
