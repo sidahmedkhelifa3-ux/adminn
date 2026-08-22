@@ -13661,6 +13661,8 @@ function switchPanel(name, clickedEl) {
   if (currentPanelName === 'scanner' && name !== 'scanner' && typeof cameraActive !== 'undefined' && cameraActive) {
     stopCameraScan();
   }
+  if (currentPanelName === 'scanner' && name !== 'scanner') releaseWarmCamera();
+  if (name === 'scanner') prewarmCamera();
   currentPanelName = name;
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   if (clickedEl) clickedEl.classList.add('active');
@@ -15815,6 +15817,62 @@ let scanRAF       = null;
 let cameraActive  = false;
 let lastScanAt    = 0;
 
+// ── Camera pre-warm ──
+// Opening the sensor is what makes the button feel slow, and no click handler
+// can shorten it. So it happens when the Scanner panel is opened instead, and
+// the button just attaches a stream that is already live.
+//
+// It only ever pre-warms when permission has already been granted: asking for
+// the camera on panel entry would ambush someone who only came to read the
+// last scan result. First run still prompts on the deliberate tap, as before.
+let warmStream  = null;
+let warmPending = null;
+
+async function prewarmCamera() {
+  if (warmStream || warmPending || cameraActive) return;
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
+  try {
+    if (!navigator.permissions || !navigator.permissions.query) return;
+    const st = await navigator.permissions.query({ name: 'camera' });
+    if (st.state !== 'granted') return;
+  } catch (e) {
+    return;   // some browsers reject the 'camera' descriptor outright
+  }
+  warmPending = navigator.mediaDevices
+    .getUserMedia({ video: { facingMode: 'environment' }, audio: false })
+    .then(s => { warmPending = null; warmStream = s; return s; })
+    .catch(() => { warmPending = null; return null; });
+}
+
+function releaseWarmCamera() {
+  if (warmPending) {
+    // prewarmCamera's own handler assigns warmStream first, so clear it here too
+    warmPending.then(s => { if (s) s.getTracks().forEach(t => t.stop()); warmStream = null; });
+    warmPending = null;
+  }
+  if (warmStream) {
+    warmStream.getTracks().forEach(t => t.stop());
+    warmStream = null;
+  }
+}
+
+// Hand the warmed stream over, or fall back to opening one now.
+async function acquireCameraStream() {
+  if (warmStream && warmStream.getVideoTracks().some(t => t.readyState === 'live')) {
+    const s = warmStream; warmStream = null; return s;
+  }
+  if (warmStream) { releaseWarmCamera(); }
+  if (warmPending) {
+    const s = await warmPending;
+    warmStream = null;
+    if (s) return s;
+  }
+  return await navigator.mediaDevices.getUserMedia({
+    video: { facingMode: 'environment' },
+    audio: false,
+  });
+}
+
 async function toggleCameraScan() {
   if (cameraActive) { stopCameraScan(); return; }
   await startCameraScan();
@@ -15846,10 +15904,7 @@ async function startCameraScan() {
   if (status) status.textContent = 'Waking the camera…';
 
   try {
-    cameraStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'environment' },
-      audio: false,
-    });
+    cameraStream = await acquireCameraStream();
   } catch (err) {
     toast('❌ Camera access denied: ' + err.message);
     if (btn) { btn.disabled = false; btn.innerHTML = icon('camera', 17) + ' Start Camera Scan'; }
@@ -15897,6 +15952,10 @@ function stopCameraScan() {
   }
   if (hint) hint.textContent = "Point the camera at a customer's HeyPoints QR code";
   if (status) status.textContent = 'Camera is off';
+  // Still on the Scanner panel? Keep one warm so the next customer is instant.
+  if (typeof currentPanelName !== 'undefined' && currentPanelName === 'scanner' && !document.hidden) {
+    prewarmCamera();
+  }
 }
 
 // When the app is sent to the background (switched away, screen off), release
@@ -15906,6 +15965,7 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden && typeof cameraActive !== 'undefined' && cameraActive) {
     stopCameraScan();
   }
+  if (document.hidden) releaseWarmCamera();
 });
 
 // jsQR runs on the main thread, so whatever we hand it is time the whole page
