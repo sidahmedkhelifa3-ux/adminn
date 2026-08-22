@@ -6,7 +6,7 @@
 //    - Google Fonts CSS                       -> Stale-While-Revalidate
 // ====================================================================
 
-const CACHE_NAME    = 'heycat-v15';
+const CACHE_NAME    = 'heycat-v16';
 const RUNTIME_CACHE = 'heycat-runtime-v2';
 
 // Notification icon, embedded so this file has no separate image dependency
