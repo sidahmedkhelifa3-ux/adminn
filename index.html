@@ -15813,6 +15813,7 @@ async function deleteSupportRequest(id) {
 let cameraStream  = null;
 let scanRAF       = null;
 let cameraActive  = false;
+let lastScanAt    = 0;
 
 async function toggleCameraScan() {
   if (cameraActive) { stopCameraScan(); return; }
@@ -15835,6 +15836,15 @@ async function startCameraScan() {
     return;
   }
 
+  // Say something before awaiting the camera. getUserMedia routinely takes half
+  // a second or more on a phone, and until it resolves nothing below runs — so
+  // the button sat unchanged and the tap read as though it had been ignored.
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = icon('camera', 17) + ' Starting camera…';
+  }
+  if (status) status.textContent = 'Waking the camera…';
+
   try {
     cameraStream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: 'environment' },
@@ -15842,6 +15852,8 @@ async function startCameraScan() {
     });
   } catch (err) {
     toast('❌ Camera access denied: ' + err.message);
+    if (btn) { btn.disabled = false; btn.innerHTML = icon('camera', 17) + ' Start Camera Scan'; }
+    if (status) status.textContent = 'Camera is off';
     return;
   }
 
@@ -15850,12 +15862,16 @@ async function startCameraScan() {
 
   cameraActive = true;
   box.classList.add('active');
-  btn.innerHTML = icon('stop', 17) + ' Stop Camera';
-  btn.classList.remove('btn-gold');
-  btn.classList.add('btn-ghost');
+  if (btn) {
+    btn.disabled = false;
+    btn.innerHTML = icon('stop', 17) + ' Stop Camera';
+    btn.classList.remove('btn-gold');
+    btn.classList.add('btn-ghost');
+  }
   if (hint) hint.textContent = 'Hold the QR code steady inside the frame';
   if (status) status.textContent = 'Camera is live — scanning…';
 
+  lastScanAt = 0;
   scanFrameLoop();
 }
 
@@ -15892,24 +15908,43 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
-function scanFrameLoop() {
+// jsQR runs on the main thread, so whatever we hand it is time the whole page
+// is frozen. A 720p frame is ~3.7 MB per getImageData and takes long enough to
+// decode that the preview visibly stutters. Reading a downscaled copy, a few
+// times a second rather than every frame, is just as reliable for a QR that is
+// being held inside the frame — and leaves the UI responsive.
+const SCAN_MAX_EDGE    = 480;
+const SCAN_INTERVAL_MS = 90;
+
+function scanFrameLoop(ts) {
   if (!cameraActive) return;
+  scanRAF = requestAnimationFrame(scanFrameLoop);
+
+  const now = ts || performance.now();
+  if (now - lastScanAt < SCAN_INTERVAL_MS) return;
+  lastScanAt = now;
+
   const video  = document.getElementById('scan-video');
   const canvas = document.getElementById('scan-canvas');
+  if (!video || !canvas || video.readyState !== video.HAVE_ENOUGH_DATA) return;
 
-  if (video.readyState === video.HAVE_ENOUGH_DATA) {
-    canvas.width  = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'dontInvert' });
-    if (code && code.data) {
-      handleCameraScanResult(code.data);
-      return; // stop the loop; handleCameraScanResult restarts it after a short pause
-    }
+  const vw = video.videoWidth, vh = video.videoHeight;
+  if (!vw || !vh) return;
+
+  const scale = Math.min(1, SCAN_MAX_EDGE / Math.max(vw, vh));
+  const w = Math.round(vw * scale), h = Math.round(vh * scale);
+  // Assigning width/height reallocates and clears the canvas, so only when it changes.
+  if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(video, 0, 0, w, h);
+  const imageData = ctx.getImageData(0, 0, w, h);
+  const code = jsQR(imageData.data, w, h, { inversionAttempts: 'dontInvert' });
+
+  if (code && code.data) {
+    if (scanRAF) { cancelAnimationFrame(scanRAF); scanRAF = null; }
+    handleCameraScanResult(code.data);
   }
-  scanRAF = requestAnimationFrame(scanFrameLoop);
 }
 
 function handleCameraScanResult(rawValue) {
