@@ -11121,6 +11121,66 @@ html,body{height:100%;font-family:'Inter',sans-serif;color:var(--text);backgroun
   #wd-wrap{grid-template-columns:1fr}
   #wd-preview-col{position:static;order:-1;margin-bottom:6px}
 }
+
+/* ══ INTRO VIDEO ══
+   Same shape as the Welcome Designer: choices on the left, a phone frame on
+   the right playing exactly what a customer will see. The frame is the same
+   300x600 as #wd-phone so the two panels feel like one dashboard. */
+#iv-wrap{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:22px;align-items:start}
+#iv-preview-col{position:sticky;top:16px}
+
+#iv-phone{
+  width:300px;height:600px;max-width:100%;margin:0 auto;
+  border-radius:26px;border:8px solid #241408;
+  overflow:hidden;box-shadow:var(--shadow-lg);
+  display:flex;align-items:center;justify-content:center;
+  /* Repainted by ivRenderPreview() to whatever backdrop colour is chosen, so
+     the letterboxing shown here is the letterboxing customers get. */
+  background:#e9e7e4;
+}
+/* cover, to match the customer app exactly. A clip that looks fine letterboxed
+   in a desktop preview and then gets its sides cropped on the phone is the
+   whole reason this preview exists. */
+#iv-phone video{width:100%;height:100%;object-fit:cover;display:block;background:transparent}
+#iv-phone .iv-none{
+  font-size:12.5px;color:rgba(255,255,255,.85);text-align:center;padding:24px;line-height:1.6;
+}
+
+.iv-mode{
+  display:flex;gap:11px;align-items:flex-start;padding:13px 14px;margin-bottom:9px;cursor:pointer;
+  border:1.5px solid var(--border);border-radius:12px;background:var(--card);
+}
+.iv-mode:last-child{margin-bottom:0}
+.iv-mode.iv-on{border-color:var(--gold);background:rgba(232,184,75,.09)}
+.iv-mode input{width:17px;height:17px;margin-top:1px;flex-shrink:0;accent-color:var(--brown);cursor:pointer}
+.iv-mode-name{font-size:13.5px;font-weight:600;color:var(--text)}
+.iv-mode-sub{font-size:11.5px;color:var(--muted);margin-top:3px;line-height:1.55}
+
+.iv-drop{
+  border:1.5px dashed var(--border);border-radius:12px;padding:22px 18px;text-align:center;
+  cursor:pointer;background:rgba(107,63,31,.03);transition:border-color .15s,background .15s;
+}
+.iv-drop:hover,.iv-drop.iv-over{border-color:var(--gold);background:rgba(232,184,75,.09)}
+.iv-drop-title{font-size:13.5px;font-weight:600;color:var(--brown)}
+.iv-drop-sub{font-size:11.5px;color:var(--muted);margin-top:5px;line-height:1.55}
+
+.iv-file{display:flex;align-items:center;gap:11px;flex-wrap:wrap;margin-top:12px;
+  padding:11px 13px;border-radius:10px;background:rgba(107,63,31,.06);font-size:12.5px}
+.iv-file b{font-weight:600;color:var(--text)}
+.iv-warn{font-size:11.5px;line-height:1.6;color:#8a5a00;background:rgba(232,184,75,.14);
+  border:1px solid rgba(232,184,75,.45);border-radius:10px;padding:10px 12px;margin-top:12px}
+
+/* Progress while a clip uploads. Video files are big enough that a silent
+   wait reads as a hang, so the bar is not optional decoration. */
+#iv-progress{display:none;margin-top:12px}
+#iv-progress-track{height:6px;border-radius:3px;background:rgba(107,63,31,.12);overflow:hidden}
+#iv-progress-bar{height:100%;width:0;background:var(--gold);transition:width .25s ease}
+#iv-progress-label{font-size:11.5px;color:var(--muted);margin-top:6px}
+
+@media(max-width:1100px){
+  #iv-wrap{grid-template-columns:1fr}
+  #iv-preview-col{position:static;order:-1;margin-bottom:6px}
+}
 </style>
 </head>
 <body>
@@ -11181,6 +11241,12 @@ html,body{height:100%;font-family:'Inter',sans-serif;color:var(--text);backgroun
   <div class="nav-item" onclick="switchPanel('apptexts',this)">
     <span class="nav-icon"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 19.5h3.2L19.3 7.9a2.26 2.26 0 0 0-3.2-3.2L4.5 16.3v3.2z"/><path d="M14.8 6l3.2 3.2"/></svg></span> App Texts
   </div>
+  <div class="nav-item" onclick="switchPanel('welcome',this)">
+    <span class="nav-icon"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2.8" width="12" height="18.4" rx="2.6"/><path d="M9.4 7.5h5.2M9.4 11h5.2M9.4 14.5h3"/></svg></span> Welcome Designer
+  </div>
+  <div class="nav-item" onclick="switchPanel('intro',this)">
+    <span class="nav-icon"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.8" y="5" width="18.4" height="14" rx="3"/><path d="M10.3 9.6l4.2 2.4-4.2 2.4z"/></svg></span> Intro Video
+  </div>
   <div class="nav-item" onclick="switchPanel('support',this)">
     <span class="nav-icon"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13.5v-1a7 7 0 0 1 14 0v1"/><rect x="2.8" y="13" width="4.2" height="6.2" rx="2.1"/><rect x="17" y="13" width="4.2" height="6.2" rx="2.1"/></svg></span> Support<span id="support-nav-badge" class="nav-badge" style="display:none"></span>
   </div>
@@ -11237,6 +11303,12 @@ html,body{height:100%;font-family:'Inter',sans-serif;color:var(--text);backgroun
   </button>
   <button class="mmore-row nav-item" onclick="switchPanel('daily',this);toggleMoreMenu()">
     <span class="nav-icon"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 10.5v3A1.5 1.5 0 0 0 6 15h1.2l4.3 3.4a1 1 0 0 0 1.6-.78V6.38a1 1 0 0 0-1.6-.78L7.2 9H6a1.5 1.5 0 0 0-1.5 1.5z"/><path d="M17 9.5a4 4 0 0 1 0 5"/></svg></span> Daily Message
+  </button>
+  <button class="mmore-row nav-item" onclick="switchPanel('intro',this);toggleMoreMenu()">
+    <span class="nav-icon"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.8" y="5" width="18.4" height="14" rx="3"/><path d="M10.3 9.6l4.2 2.4-4.2 2.4z"/></svg></span> Intro Video
+  </button>
+  <button class="mmore-row nav-item" onclick="switchPanel('welcome',this);toggleMoreMenu()">
+    <span class="nav-icon"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2.8" width="12" height="18.4" rx="2.6"/><path d="M9.4 7.5h5.2M9.4 11h5.2M9.4 14.5h3"/></svg></span> Welcome Designer
   </button>
   <button class="mmore-row nav-item" onclick="switchPanel('apptexts',this);toggleMoreMenu()">
     <span class="nav-icon"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 19.5h3.2L19.3 7.9a2.26 2.26 0 0 0-3.2-3.2L4.5 16.3v3.2z"/><path d="M14.8 6l3.2 3.2"/></svg></span> App Texts
@@ -12028,6 +12100,127 @@ html,body{height:100%;font-family:'Inter',sans-serif;color:var(--text);backgroun
     </div>
 
     <!-- ══════════════════════════════════════
+         PANEL: INTRO VIDEO
+         The clip that plays while the customer app opens, before the welcome
+         screen. One JSON row in app_settings (key: intro_video), and — like
+         splash_layout — an empty row means "use the animation built into the
+         app", never "no intro".
+
+         Everything here says "the next time they open the app" on purpose.
+         The intro is the very first thing drawn, so the app cannot wait on
+         the network to find out what to play: it plays whatever it saw last
+         time and downloads the change in the background for the launch after.
+         That is one deliberate launch of delay, not a bug to report.
+    ══════════════════════════════════════ -->
+    <div id="panel-intro" class="panel">
+      <div class="section-title">Intro Video</div>
+      <div class="section-sub">
+        The few seconds of animation customers see while the app opens. Keep the built-in
+        one, upload your own clip, or turn it off so the app opens straight onto the welcome screen.
+      </div>
+
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:18px">
+        <button class="btn btn-gold" id="iv-save-btn" onclick="saveIntroVideo()">Save intro</button>
+        <button class="btn btn-ghost" onclick="resetIntroVideo()">Back to the built-in animation</button>
+        <span id="iv-saved-msg" style="font-size:12px;font-weight:600;color:#27AE60;display:none">
+          ✅ Saved — phones pick it up the next time they open the app</span>
+      </div>
+
+      <div id="iv-wrap">
+        <div>
+          <div class="card">
+            <div class="card-title" style="margin-bottom:12px"><span class="ct-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.8" y="5" width="18.4" height="14" rx="3"/><path d="M10.3 9.6l4.2 2.4-4.2 2.4z"/></svg></span>What plays when the app opens</div>
+
+            <label class="iv-mode" id="iv-mode-default" onclick="ivSetMode('default')">
+              <input type="radio" name="iv-mode" value="default">
+              <span>
+                <span class="iv-mode-name">The built-in animation</span>
+                <span class="iv-mode-sub">The HEYCAT paw-and-beans clip that ships inside the app. Already on every phone, so it costs nothing to download and plays instantly even with no signal.</span>
+              </span>
+            </label>
+
+            <label class="iv-mode" id="iv-mode-custom" onclick="ivSetMode('custom')">
+              <input type="radio" name="iv-mode" value="custom">
+              <span>
+                <span class="iv-mode-name">My own video</span>
+                <span class="iv-mode-sub">Upload a clip below. Each phone downloads it once and then plays it from its own storage, so it costs one download per customer, not one per launch.</span>
+              </span>
+            </label>
+
+            <label class="iv-mode" id="iv-mode-off" onclick="ivSetMode('off')">
+              <input type="radio" name="iv-mode" value="off">
+              <span>
+                <span class="iv-mode-name">No intro at all</span>
+                <span class="iv-mode-sub">The app opens straight onto the welcome screen. The fastest option, and the right one if the intro starts feeling like a delay rather than a greeting.</span>
+              </span>
+            </label>
+          </div>
+
+          <div class="card" id="iv-upload-card" style="display:none">
+            <div class="card-title" style="margin-bottom:12px"><span class="ct-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15.5V4.2"/><path d="M8.2 7.8L12 4l3.8 3.8"/><path d="M4.5 14.5v3.2a2.3 2.3 0 0 0 2.3 2.3h10.4a2.3 2.3 0 0 0 2.3-2.3v-3.2"/></svg></span>The clip</div>
+
+            <div class="iv-drop" id="iv-drop" onclick="ivPickFile()"
+              ondragover="ivDrag(event,true)" ondragleave="ivDrag(event,false)" ondrop="ivDrop(event)">
+              <div class="iv-drop-title">Choose a video, or drop one here</div>
+              <div class="iv-drop-sub">MP4 (H.264) works everywhere. Portrait, up to 8&nbsp;MB.</div>
+            </div>
+
+            <div class="iv-file" id="iv-file-row" style="display:none"></div>
+
+            <div id="iv-progress">
+              <div id="iv-progress-track"><div id="iv-progress-bar"></div></div>
+              <div id="iv-progress-label">Uploading…</div>
+            </div>
+
+            <div id="iv-warnings"></div>
+
+            <div class="wd-fields" style="margin-top:16px">
+              <div class="wd-f">
+                <label>Backdrop colour</label>
+                <input type="color" id="iv-bg" value="#e9e7e4" oninput="ivSetBg(this.value)">
+              </div>
+              <div class="wd-f" style="display:flex;flex-direction:column;justify-content:flex-end">
+                <div style="font-size:11px;color:var(--muted);line-height:1.6;padding-bottom:8px">
+                  What sits behind the video while it decodes, and in any sliver the clip
+                  does not cover. Match it to your clip's own background and the join is invisible.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title" style="margin-bottom:10px"><span class="ct-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.4"/><path d="M12 11v5.2M12 7.9v.1"/></svg></span>What makes a good intro</div>
+            <div style="font-size:12.5px;color:var(--muted);line-height:1.85">
+              <b style="color:var(--text)">Portrait, and tall.</b> 1080×1920 or taller. The app crops the
+              sides, never the top and bottom, so anything wide loses its edges.<br>
+              <b style="color:var(--text)">Short.</b> Four to six seconds. Customers who opened the app
+              wanted the app; the intro is a greeting, not a trailer.<br>
+              <b style="color:var(--text)">Small.</b> Under 3&nbsp;MB if you can. Every customer downloads
+              it once, and some of them are on mobile data.<br>
+              <b style="color:var(--text)">Silent.</b> Phones play it muted — no browser lets a video make
+              noise on its own — so anything you need heard has to be on screen.<br>
+              <b style="color:var(--text)">Ending on your logo</b> reads best. The clip fades into the
+              welcome screen, so the last frame is the one people actually register.
+            </div>
+          </div>
+        </div>
+
+        <div id="iv-preview-col">
+          <div class="wd-zone-name" style="margin-bottom:10px">Live preview</div>
+          <div id="iv-phone"></div>
+          <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:10px">
+            <button class="btn btn-ghost btn-sm" onclick="ivReplay()">↻ Play again</button>
+          </div>
+          <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:8px;line-height:1.5">
+            Cropped exactly the way a phone crops it.
+          </div>
+        </div>
+      </div>
+
+      <input type="file" id="iv-file-input" accept="video/mp4,video/webm,video/quicktime" style="display:none" onchange="ivFilePicked(event)">
+    </div>
+
+    <!-- ══════════════════════════════════════
          PANEL: CUSTOMERS
     ══════════════════════════════════════ -->
     <div id="panel-customers" class="panel">
@@ -12405,6 +12598,8 @@ async function loadAllData() {
   loadAppTexts();
   // ...and the welcome screen's layout, photo and colours
   loadSplashDesign();
+  // ...and the clip that plays on the way in
+  loadIntroVideo();
   // ...and the wording of the once-a-day message
   loadDailyMessages();
 
@@ -12446,6 +12641,369 @@ async function saveFreeCoffeeThreshold() {
   const msg = document.getElementById('free-coffee-saved-msg');
   if (msg) { msg.style.display = 'inline'; setTimeout(() => msg.style.display = 'none', 2500); }
   toast(`✅ Free coffee threshold set to ${val.toLocaleString()} DA`);
+}
+
+// ════════════════════════════════════════
+// INTRO VIDEO — the clip that plays while the customer app opens
+//
+// One JSON row in app_settings (key: intro_video):
+//   { v, mode:'default'|'custom'|'off', url, ver, bg }
+// An empty or unreadable row means 'default', matching splash_layout — a
+// blank row must never mean "no intro", or a bad save blanks the app's face.
+//
+// `ver` is a timestamp bumped on every upload. The phone keys its local copy
+// of the clip on it, so re-uploading is always enough to make phones refetch;
+// nobody has to think about caching.
+// ════════════════════════════════════════
+const IV_DEFAULT_BG = '#e9e7e4';   // the wall colour in the built-in clip
+const IV_MAX_BYTES  = 20 * 1024 * 1024;
+const IV_WARN_BYTES = 5 * 1024 * 1024;
+
+let ivCfg = null;          // the saved-or-being-edited config
+let ivPendingUrl = null;   // object URL for a clip that is uploading, so the
+                           // preview can play before the upload finishes
+let ivProbeInfo = null;    // { w, h, d } of the current clip, for the warnings
+let ivLastSize = 0;        // bytes of the clip picked this visit, same purpose
+
+function ivDefaultCfg() { return { v:1, mode:'default', url:'', ver:0, bg:IV_DEFAULT_BG }; }
+
+async function loadIntroVideo() {
+  let saved = null;
+  try {
+    const { data, error } = await db.from('app_settings')
+      .select('value').eq('key', 'intro_video').maybeSingle();
+    if (!error && data && data.value) saved = JSON.parse(data.value);
+  } catch (e) {
+    console.warn('[HEYCAT ADMIN] could not read intro_video:', e);
+  }
+  ivCfg = ivNormalise(saved);
+  if (currentPanelName === 'intro') renderIntroPanel();
+}
+
+// A row written by an older version of this panel, or half-typed by hand, must
+// still produce something the editors can bind to.
+function ivNormalise(c) {
+  const d = ivDefaultCfg();
+  if (!c || typeof c !== 'object') return d;
+  const mode = ['default','custom','off'].includes(c.mode) ? c.mode : 'default';
+  return {
+    v: 1,
+    // "custom with no clip" is not a state the app can play, so it degrades to
+    // the built-in one rather than to a black screen.
+    mode: (mode === 'custom' && !c.url) ? 'default' : mode,
+    url: typeof c.url === 'string' ? c.url : '',
+    ver: Number(c.ver) || 0,
+    bg:  /^#[0-9a-f]{6}$/i.test(c.bg || '') ? c.bg : IV_DEFAULT_BG,
+  };
+}
+
+// ── Editing ──
+
+function ivSetMode(mode) {
+  if (!ivCfg) return;
+  ivCfg.mode = mode;
+  renderIntroPanel();
+}
+
+function ivSetBg(hex) {
+  if (!ivCfg) return;
+  ivCfg.bg = hex;
+  const phone = document.getElementById('iv-phone');
+  if (phone) phone.style.background = hex;
+}
+
+function ivPickFile() {
+  const input = document.getElementById('iv-file-input');
+  if (input) { input.value = ''; input.click(); }
+}
+
+function ivDrag(ev, over) {
+  ev.preventDefault();
+  const el = document.getElementById('iv-drop');
+  if (el) el.classList.toggle('iv-over', !!over);
+}
+
+function ivDrop(ev) {
+  ev.preventDefault();
+  ivDrag(ev, false);
+  const file = ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files[0];
+  if (file) ivHandleFile(file);
+}
+
+function ivFilePicked(ev) {
+  const file = ev.target.files && ev.target.files[0];
+  if (file) ivHandleFile(file);
+}
+
+// Reads width, height and duration without decoding the whole file. Resolves
+// null rather than rejecting: the warnings it feeds are advice, so a codec the
+// dashboard's browser can't open must not block an upload the phone could play.
+function ivProbeVideo(url) {
+  return new Promise(resolve => {
+    const v = document.createElement('video');
+    let settled = false;
+    const finish = (info) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      v.removeAttribute('src');
+      resolve(info);
+    };
+    const timer = setTimeout(() => finish(null), 5000);
+    v.preload = 'metadata';
+    v.muted = true;
+    v.onloadedmetadata = () => finish({ w: v.videoWidth, h: v.videoHeight, d: v.duration });
+    v.onerror = () => finish(null);
+    v.src = url;
+  });
+}
+
+async function ivHandleFile(file) {
+  if (!ivCfg) return;
+  if (!file.type.startsWith('video/')) { toast('❌ That is not a video file'); return; }
+  if (file.size > IV_MAX_BYTES) {
+    toast('❌ That clip is ' + ivSize(file.size) + '. Keep it under 20MB — every customer downloads it.');
+    return;
+  }
+
+  // Preview immediately from the local file. The upload can take a while on a
+  // shop's connection, and watching your own clip play is the fastest way to
+  // find out you picked the wrong one.
+  if (ivPendingUrl) URL.revokeObjectURL(ivPendingUrl);
+  ivPendingUrl = URL.createObjectURL(file);
+  ivCfg.mode = 'custom';
+  ivLastSize = file.size;
+  ivProbeInfo = await ivProbeVideo(ivPendingUrl);
+  renderIntroPanel();
+  ivRenderFileRow(file.name, file.size, 'uploading');
+
+  const bar   = document.getElementById('iv-progress-bar');
+  const label = document.getElementById('iv-progress-label');
+  const wrap  = document.getElementById('iv-progress');
+  if (wrap) wrap.style.display = 'block';
+
+  try {
+    const ext = ({ 'video/mp4':'mp4', 'video/webm':'webm', 'video/quicktime':'mov' })[file.type]
+      || (file.name.split('.').pop() || 'mp4').toLowerCase().slice(0, 4);
+    // Under splash/ rather than a new intro/ prefix: this bucket's upload
+    // policy is already proven for that path by the Welcome Designer, and a
+    // new prefix would be one more thing to authorise before this works.
+    const path = `splash/intro-${Date.now()}-${Math.random().toString(36).slice(2,8)}.${ext}`;
+
+    await ivUpload(path, file, pct => {
+      if (bar)   bar.style.width = Math.round(pct * 100) + '%';
+      if (label) label.textContent = 'Uploading… ' + Math.round(pct * 100) + '%';
+    });
+
+    const { data: pub } = db.storage.from('menu-images').getPublicUrl(path);
+    ivCfg.url = pub.publicUrl;
+    ivCfg.ver = Date.now();
+    if (wrap) wrap.style.display = 'none';
+    ivRenderFileRow(file.name, file.size, 'ready');
+    toast('✅ Clip uploaded — now press Save intro');
+  } catch (err) {
+    if (wrap) wrap.style.display = 'none';
+    ivRenderFileRow(file.name, file.size, 'failed');
+    toast('❌ Upload failed: ' + (err.message || 'unknown error'));
+  }
+}
+
+// supabase-js has no upload progress, and a silent two-minute wait on a video
+// reads as a frozen dashboard — so this posts to the storage REST endpoint
+// directly, which is the same call with an onprogress attached.
+function ivUpload(path, file, onProgress) {
+  return new Promise((resolve, reject) => {
+    (async () => {
+      let token = SUPABASE_KEY;
+      try {
+        const { data } = await db.auth.getSession();
+        if (data && data.session && data.session.access_token) token = data.session.access_token;
+      } catch { /* signed out — the anon key is what the client would have sent anyway */ }
+
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `${SUPABASE_URL}/storage/v1/object/menu-images/${path}`, true);
+      xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+      xhr.setRequestHeader('apikey', SUPABASE_KEY);
+      // Each upload gets its own filename, so the file at a URL never changes
+      // and phones can hold onto it for as long as they like.
+      xhr.setRequestHeader('cache-control', 'max-age=31536000');
+      xhr.setRequestHeader('content-type', file.type || 'video/mp4');
+      xhr.upload.onprogress = e => { if (e.lengthComputable && onProgress) onProgress(e.loaded / e.total); };
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) return resolve();
+        let msg = 'HTTP ' + xhr.status;
+        try { const j = JSON.parse(xhr.responseText); msg = j.message || j.error || msg; } catch { }
+        if (xhr.status === 403 || xhr.status === 401) msg += ' — the storage bucket refused the upload';
+        reject(new Error(msg));
+      };
+      xhr.onerror = () => reject(new Error('the connection dropped'));
+      xhr.send(file);
+    })();
+  });
+}
+
+function ivSize(bytes) {
+  return bytes >= 1024 * 1024
+    ? (bytes / 1024 / 1024).toFixed(1) + ' MB'
+    : Math.round(bytes / 1024) + ' KB';
+}
+
+// ── Drawing the panel ──
+
+function renderIntroPanel() {
+  if (!ivCfg) { loadIntroVideo(); return; }
+
+  ['default','custom','off'].forEach(m => {
+    const row = document.getElementById('iv-mode-' + m);
+    if (!row) return;
+    const on = ivCfg.mode === m;
+    row.classList.toggle('iv-on', on);
+    const radio = row.querySelector('input');
+    if (radio) radio.checked = on;
+  });
+
+  const card = document.getElementById('iv-upload-card');
+  if (card) card.style.display = ivCfg.mode === 'custom' ? '' : 'none';
+
+  const bg = document.getElementById('iv-bg');
+  if (bg) bg.value = ivCfg.bg;
+
+  ivRenderWarnings();
+  ivRenderPreview();
+}
+
+function ivRenderFileRow(name, size, state) {
+  const row = document.getElementById('iv-file-row');
+  if (!row) return;
+  const badge = {
+    uploading: '<span style="color:var(--muted)">uploading…</span>',
+    ready:     '<span style="color:#27AE60;font-weight:600">✅ uploaded</span>',
+    failed:    '<span style="color:#C0392B;font-weight:600">❌ failed</span>',
+  }[state] || '';
+  // A clip whose duration the browser could not work out still uploads fine —
+  // it just doesn't get to claim a length it doesn't know.
+  const secs = (ivProbeInfo && isFinite(ivProbeInfo.d)) ? ` · ${ivProbeInfo.d.toFixed(1)}s` : '';
+  const dims = ivProbeInfo ? ` · ${ivProbeInfo.w}×${ivProbeInfo.h}${secs}` : '';
+  row.style.display = 'flex';
+  row.innerHTML = `<b>${escapeHtml(name)}</b><span style="color:var(--muted)">${ivSize(size)}${escapeHtml(dims)}</span>${badge}`;
+}
+
+// Advice, never a wall. Everything here is something that will look wrong on a
+// phone rather than something that will break, so the upload still goes ahead.
+function ivRenderWarnings() {
+  const box = document.getElementById('iv-warnings');
+  if (!box) return;
+  const out = [];
+  const info = ivProbeInfo;
+
+  if (info) {
+    if (info.w > info.h) {
+      out.push('This clip is <b>landscape</b>. The app fills a portrait screen, so it will keep the middle and crop most of the width away.');
+    } else if (info.h / info.w < 1.7) {
+      out.push('This clip is portrait but not very tall (' + info.w + '×' + info.h + '). Tall phones will lose a little off the sides — 1080×1920 or taller avoids that.');
+    }
+    if (isFinite(info.d) && info.d > 8) {
+      out.push('It runs <b>' + info.d.toFixed(1) + ' seconds</b>. The app moves on once the clip has had its run plus a moment, but customers start tapping past long before that — four to six seconds is the sweet spot.');
+    }
+  }
+
+  if (ivLastSize > IV_WARN_BYTES) {
+    out.push('At <b>' + ivSize(ivLastSize) + '</b> this is a big download for one animation. '
+      + 'Every customer pays for it once, and some of them are on mobile data — under 3&nbsp;MB is a kinder target.');
+  }
+
+  box.innerHTML = out.map(m => `<div class="iv-warn">${m}</div>`).join('');
+}
+
+function ivRenderPreview() {
+  const phone = document.getElementById('iv-phone');
+  if (!phone || !ivCfg) return;
+  phone.style.background = ivCfg.bg;
+
+  if (ivCfg.mode === 'off') {
+    phone.innerHTML = '<div class="iv-none" style="color:var(--muted)">No intro.<br>The app opens straight onto the welcome screen.</div>';
+    return;
+  }
+
+  // The built-in clip is a file inside the customer app, not something this
+  // dashboard is served alongside — so it is fetched from the live app.
+  const src = ivCfg.mode === 'custom'
+    ? (ivPendingUrl || ivCfg.url)
+    : 'https://heycattt.vercel.app/intro.mp4';
+
+  if (!src) {
+    phone.innerHTML = '<div class="iv-none" style="color:var(--muted)">No clip chosen yet.<br>Pick one on the left.</div>';
+    return;
+  }
+
+  phone.innerHTML = '';
+  const v = document.createElement('video');
+  v.id = 'iv-preview-video';
+  v.src = src;
+  v.muted = true;
+  v.autoplay = true;
+  v.playsInline = true;
+  v.setAttribute('playsinline', '');
+  v.preload = 'auto';
+  v.onerror = () => {
+    phone.innerHTML = '<div class="iv-none" style="color:var(--muted)">Could not play this clip here.<br>It may still work on a phone — but check the format before you save.</div>';
+  };
+  phone.appendChild(v);
+  const p = v.play();
+  if (p && p.catch) p.catch(() => { /* a browser that won't autoplay; the Play again button covers it */ });
+}
+
+function ivReplay() {
+  const v = document.getElementById('iv-preview-video');
+  if (!v) { ivRenderPreview(); return; }
+  v.currentTime = 0;
+  const p = v.play();
+  if (p && p.catch) p.catch(() => { });
+}
+
+// ── Saving ──
+
+async function saveIntroVideo() {
+  if (!ivCfg) return;
+  if (ivCfg.mode === 'custom' && !ivCfg.url) {
+    toast('Choose a clip first, or pick one of the other two options');
+    return;
+  }
+
+  const btn = document.getElementById('iv-save-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+
+  // 'default' is written as an empty row, not as a copy of the defaults — the
+  // same contract as splash_layout, so redesigning the intro inside the app
+  // later reaches customers without anyone reopening this panel.
+  const value = ivCfg.mode === 'default'
+    ? ''
+    : JSON.stringify({ v:1, mode: ivCfg.mode, url: ivCfg.url, ver: ivCfg.ver, bg: ivCfg.bg });
+
+  const { error } = await db.from('app_settings')
+    .upsert({ key:'intro_video', value }, { onConflict:'key' });
+
+  if (btn) { btn.disabled = false; btn.textContent = 'Save intro'; }
+  if (error) { toast('❌ Error saving: ' + error.message); return; }
+
+  const msg = document.getElementById('iv-saved-msg');
+  if (msg) { msg.style.display = 'inline'; setTimeout(() => msg.style.display = 'none', 5000); }
+  toast('✅ Intro saved — phones pick it up the next time they open the app');
+}
+
+async function resetIntroVideo() {
+  if (!confirm('Go back to the animation built into the app?')) return;
+  const { error } = await db.from('app_settings')
+    .upsert({ key:'intro_video', value:'' }, { onConflict:'key' });
+  if (error) { toast('❌ Error: ' + error.message); return; }
+  if (ivPendingUrl) { URL.revokeObjectURL(ivPendingUrl); ivPendingUrl = null; }
+  ivProbeInfo = null;
+  ivLastSize = 0;
+  ivCfg = ivDefaultCfg();
+  const row = document.getElementById('iv-file-row');
+  if (row) { row.style.display = 'none'; row.innerHTML = ''; }
+  renderIntroPanel();
+  toast('↩️ Back to the built-in animation');
 }
 
 // ════════════════════════════════════════
@@ -13640,7 +14198,7 @@ function toggleMoreMenu() {
 const panelTitles = {
   overview:'Overview', giftcards:'Gift Cards', homeposts:'Home Posts', treats:'Treats / Offers',
   cats:'Cats', rewards:'Rewards', customers:'Customers', scanner:'QR Scanner', support:'Support',
-  apptexts:'App Texts', welcome:'Welcome Designer', daily:'Daily Message'
+  apptexts:'App Texts', welcome:'Welcome Designer', intro:'Intro Video', daily:'Daily Message'
 };
 const panelSubs = {
   overview:"Here's what's happening today",
@@ -13654,6 +14212,7 @@ const panelSubs = {
   support:'Problem reports submitted by customers',
   apptexts:'Wording on the customer welcome screen',
   welcome:'Design the first screen customers see',
+  intro:'The clip that plays while the app opens',
   daily:'The message every customer gets once a day'
 };
 
@@ -13663,6 +14222,11 @@ function switchPanel(name, clickedEl) {
   }
   if (currentPanelName === 'scanner' && name !== 'scanner') releaseWarmCamera();
   if (name === 'scanner') prewarmCamera();
+  // A video in a hidden panel keeps decoding. Stop it on the way out.
+  if (currentPanelName === 'intro' && name !== 'intro') {
+    const pv = document.getElementById('iv-preview-video');
+    if (pv) pv.pause();
+  }
   currentPanelName = name;
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   if (clickedEl) clickedEl.classList.add('active');
@@ -13693,6 +14257,7 @@ function renderCurrentPanel() {
   if (currentPanelName === 'rewards')      { renderRewardsTable(); renderTiersTable(); }
   if (currentPanelName === 'support')      renderSupportTable();
   if (currentPanelName === 'welcome')      renderWelcomeDesigner();
+  if (currentPanelName === 'intro')        renderIntroPanel();
   if (currentPanelName === 'daily')        renderDailyPanel();
 }
 
