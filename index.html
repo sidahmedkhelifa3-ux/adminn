@@ -29,6 +29,19 @@
   const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR3ZW1ma3hlZ3p1d3ZsbXp6Zm5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3OTcwMzgsImV4cCI6MjA5NzM3MzAzOH0.b-XGUZxq2_OmT7qgcsCI7HwD2ZbwsKqP5V_97Gok-QA';                     // ← replace this
   const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+  /* How long a phone may keep an uploaded photo: one year, in seconds.
+     Supabase's default is one hour, which is wrong for this app in an
+     expensive way. Every upload path here builds its filename out of
+     Date.now(), so a photo at a given URL is never edited — changing a picture
+     in this dashboard writes a *new* file at a *new* URL. The bytes are
+     therefore permanent, and an hour meant every customer re-downloaded the
+     whole menu several times a day for nothing.
+
+     This is the single biggest lever on the project's bandwidth bill. If an
+     upload path is ever changed to reuse a filename, this has to come off it
+     in the same edit, or that image will be stuck on phones for a year. */
+  const IMMUTABLE_CACHE = '31536000';
+
   // Escapes text before it's dropped into innerHTML — same helper as the
   // customer app, so content typed here can't break out of markup either.
   function escapeHtml(str) {
@@ -12230,7 +12243,7 @@ html,body{height:100%;font-family:'Inter',sans-serif;color:var(--text);backgroun
       <div style="display:flex;gap:12px;margin-bottom:20px">
         <div class="search-wrap" style="flex:1">
           <span style="color:var(--muted);font-size:15px">🔍</span>
-          <input placeholder="Search customers..." oninput="filterCustomers(this.value)">
+          <input placeholder="Search customers..." oninput="customersSearch(this.value)">
         </div>
       </div>
 
@@ -12247,6 +12260,14 @@ html,body{height:100%;font-family:'Inter',sans-serif;color:var(--text);backgroun
           </thead>
           <tbody id="customers-tbody"></tbody>
         </table>
+        </div>
+        <div id="customers-pager" style="display:none;align-items:center;justify-content:space-between;
+          gap:12px;flex-wrap:wrap;padding:12px 16px;border-top:1px solid var(--border)">
+          <div id="customers-count" style="font-size:12px;color:var(--muted)"></div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-ghost btn-sm" id="customers-prev" onclick="customersPage(-1)">← Previous</button>
+            <button class="btn btn-ghost btn-sm" id="customers-next" onclick="customersPage(1)">Next →</button>
+          </div>
         </div>
       </div>
     </div>
@@ -12522,15 +12543,48 @@ async function initAdmin() {
 // ════════════════════════════════════════
 // LOAD ALL DATA
 // ════════════════════════════════════════
+
+/* Supabase caps a single response at 1000 rows, and it does it silently — no
+   error, no flag, just a short array. For most tables here that will never
+   matter; for customers it matters a great deal, because every lookup in this
+   dashboard resolves against adminData.customers rather than the database:
+   the QR scanner, manualCode(), the quick-add dropdown, the bonus and redeem
+   buttons. A truncated array is therefore not a display problem — it is the
+   1001st customer standing at the counter whose code cannot be found.
+
+   So page through until a short page comes back. */
+async function fetchAll(table, tune) {
+  const PAGE = 1000;
+  let rows = [], from = 0;
+  for (;;) {
+    let q = db.from(table).select('*');
+    if (tune) q = tune(q);
+    const { data, error } = await q.range(from, from + PAGE - 1);
+    // Hand back whatever arrived before the failure: a half-loaded dashboard
+    // beats an empty one, and the caller only checks for data.
+    if (error) return { data: rows.length ? rows : null, error };
+    rows = rows.concat(data || []);
+    if (!data || data.length < PAGE) return { data: rows, error: null };
+    from += PAGE;
+    // A guard, not a limit anyone should hit. Past this the dashboard needs
+    // real server-side search rather than a bigger array.
+    if (rows.length >= 50000) {
+      console.warn(`[HEYCAT ADMIN] ${table}: stopped at 50000 rows`);
+      return { data: rows, error: null };
+    }
+  }
+}
+
 async function loadAllData() {
   const [gcRes, hpRes, cRes, mRes, msRes, trRes, srRes, trtRes] = await Promise.all([
     db.from('gift_cards').select('*').order('created_at',{ascending:false}),
     db.from('home_posts').select('*').order('sort_order',{ascending:true}).order('created_at',{ascending:false}),
-    db.from('profiles').select('*').order('created_at',{ascending:false}),
+    // Paged: the only two tables here that grow without anyone curating them.
+    fetchAll('profiles', q => q.order('created_at',{ascending:false})),
     db.from('menu_items').select('*').order('cat').order('name'),
     db.from('milestones').select('*').order('sort_order').order('pts'),
     db.from('loyalty_tiers').select('*').order('sort_order').order('pts_required'),
-    db.from('support_requests').select('*').order('created_at',{ascending:false}),
+    fetchAll('support_requests', q => q.order('created_at',{ascending:false})),
     db.from('treats').select('*').order('sort_order',{ascending:true}).order('created_at',{ascending:false}),
   ]);
   if (gcRes.data) adminData.giftCards  = gcRes.data;
@@ -12826,7 +12880,7 @@ function ivUpload(path, file, onProgress) {
       xhr.setRequestHeader('apikey', SUPABASE_KEY);
       // Each upload gets its own filename, so the file at a URL never changes
       // and phones can hold onto it for as long as they like.
-      xhr.setRequestHeader('cache-control', 'max-age=31536000');
+      xhr.setRequestHeader('cache-control', 'max-age=' + IMMUTABLE_CACHE);
       xhr.setRequestHeader('content-type', file.type || 'video/mp4');
       xhr.upload.onprogress = e => { if (e.lengthComputable && onProgress) onProgress(e.loaded / e.total); };
       xhr.onload = () => {
@@ -13644,7 +13698,7 @@ async function wdPhotoPicked(event) {
     const ext = mimeExt[file.type] || 'jpg';
     const path = `splash/${Date.now()}-${Math.random().toString(36).slice(2,8)}.${ext}`;
     const { error: upErr } = await db.storage.from(MENU_IMAGE_BUCKET)
-      .upload(path, file, { cacheControl:'3600', upsert:false, contentType:file.type || 'image/jpeg' });
+      .upload(path, file, { cacheControl: IMMUTABLE_CACHE, upsert:false, contentType:file.type || 'image/jpeg' });
     if (upErr) throw upErr;
     const { data: pub } = db.storage.from(MENU_IMAGE_BUCKET).getPublicUrl(path);
     wdSet(id, 'src', pub.publicUrl, true);
@@ -14430,7 +14484,7 @@ async function saveGiftCard() {
   if (gcImageFile) {
     const ext  = gcImageFile.name.split('.').pop();
     const path = `gift-cards/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-    const { error: upErr } = await db.storage.from('menu-images').upload(path, gcImageFile, { upsert: true });
+    const { error: upErr } = await db.storage.from('menu-images').upload(path, gcImageFile, { upsert: true, cacheControl: IMMUTABLE_CACHE });
     if (upErr) {
       toast('❌ Image upload failed: ' + upErr.message);
       btn.disabled = false; btn.textContent = 'Save Gift Card'; return;
@@ -14585,7 +14639,7 @@ async function savePost() {
   if (hpImageFile) {
     const ext  = hpImageFile.name.split('.').pop();
     const path = `home-posts/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-    const { error: upErr } = await db.storage.from('menu-images').upload(path, hpImageFile, { upsert: true });
+    const { error: upErr } = await db.storage.from('menu-images').upload(path, hpImageFile, { upsert: true, cacheControl: IMMUTABLE_CACHE });
     if (upErr) {
       toast('❌ Image upload failed: ' + upErr.message);
       btn.disabled = false; btn.textContent = 'Save Post'; return;
@@ -14841,7 +14895,7 @@ async function saveTreat() {
   if (trImageFile) {
     const ext  = trImageFile.name.split('.').pop();
     const path = `treats/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-    const { error: upErr } = await db.storage.from('menu-images').upload(path, trImageFile, { upsert: true });
+    const { error: upErr } = await db.storage.from('menu-images').upload(path, trImageFile, { upsert: true, cacheControl: IMMUTABLE_CACHE });
     if (upErr) {
       toast('❌ Image upload failed: ' + upErr.message);
       btn.disabled = false; btn.textContent = 'Save Treat'; return;
@@ -15528,7 +15582,7 @@ async function saveCat() {
   let photo = catPhotoUrl;
   if (catImageFile) {
     const path = `cats/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
-    const { error: upErr } = await db.storage.from('menu-images').upload(path, catImageFile, { upsert: true });
+    const { error: upErr } = await db.storage.from('menu-images').upload(path, catImageFile, { upsert: true, cacheControl: IMMUTABLE_CACHE });
     if (upErr) {
       toast('❌ Photo upload failed: ' + upErr.message);
       btn.disabled = false; btn.textContent = 'Save Cat'; return;
@@ -15539,7 +15593,7 @@ async function saveCat() {
   let cover = catCoverUrl;
   if (catCoverFile) {
     const cpath = `cats/covers/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
-    const { error: cErr } = await db.storage.from('menu-images').upload(cpath, catCoverFile, { upsert: true });
+    const { error: cErr } = await db.storage.from('menu-images').upload(cpath, catCoverFile, { upsert: true, cacheControl: IMMUTABLE_CACHE });
     if (cErr) {
       toast('❌ Cover upload failed: ' + cErr.message);
       btn.disabled = false; btn.textContent = 'Save Cat'; return;
@@ -15553,7 +15607,7 @@ async function saveCat() {
     const ext  = (catVideoFile.name.split('.').pop() || 'mp4').toLowerCase();
     const vpath = `cats/clips/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
     const { error: vErr } = await db.storage.from('menu-images')
-      .upload(vpath, catVideoFile, { upsert: true, contentType: catVideoFile.type || 'video/mp4' });
+      .upload(vpath, catVideoFile, { upsert: true, cacheControl: IMMUTABLE_CACHE, contentType: catVideoFile.type || 'video/mp4' });
     if (vErr) {
       toast('❌ Clip upload failed: ' + vErr.message);
       btn.disabled = false; btn.textContent = 'Save Cat'; return;
@@ -15782,7 +15836,7 @@ async function uploadMenuItemPhotoFile(file) {
     const filePath = `items/${Date.now()}-${Math.random().toString(36).slice(2,8)}.${ext}`;
 
     const { error: uploadError } = await db.storage.from(MENU_IMAGE_BUCKET).upload(filePath, file, {
-      cacheControl: '3600',
+      cacheControl: IMMUTABLE_CACHE,
       upsert: false,
       contentType: file.type || 'image/jpeg',
     });
@@ -16169,6 +16223,29 @@ async function sendNotification() {
 // ════════════════════════════════════════
 // CUSTOMER SEARCH FILTER
 // ════════════════════════════════════════
+/* The whole customer list lives in memory — every lookup in this dashboard
+   needs it there — but it does not all need to be in the DOM. Each row below
+   is six cells and three buttons, so a few thousand customers is tens of
+   thousands of elements and a table that takes seconds to appear and stutters
+   when you type. The list is complete; only the page you are looking at is
+   built. */
+const CUSTOMERS_PER_PAGE = 50;
+let customersPageIndex = 0;
+
+// Searching from the middle of page 7 should show the first match, not an
+// empty page 7 of a much shorter list.
+function customersSearch(q) {
+  customersPageIndex = 0;
+  filterCustomers(q);
+}
+
+function customersPage(delta) {
+  customersPageIndex = Math.max(0, customersPageIndex + delta);
+  filterCustomers(document.querySelector('#panel-customers .search-wrap input')?.value || '');
+  const panel = document.getElementById('panel-customers');
+  if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 function filterCustomers(q) {
   const tbody = document.getElementById('customers-tbody');
   if (!tbody) return;
@@ -16178,8 +16255,34 @@ function filterCustomers(q) {
     (c.name || '').toLowerCase().includes(search) ||
     (c.email || '').toLowerCase().includes(search)
   );
-  if (!customers.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--muted)">No customers found</td></tr>'; return; }
-  tbody.innerHTML = customers.map(c => `
+
+  const pager = document.getElementById('customers-pager');
+  if (!customers.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--muted)">No customers found</td></tr>';
+    if (pager) pager.style.display = 'none';
+    return;
+  }
+
+  // Deleting the last customer on the final page must not strand you on a page
+  // that no longer exists.
+  const pages = Math.ceil(customers.length / CUSTOMERS_PER_PAGE);
+  if (customersPageIndex >= pages) customersPageIndex = pages - 1;
+  const start = customersPageIndex * CUSTOMERS_PER_PAGE;
+  const shown = customers.slice(start, start + CUSTOMERS_PER_PAGE);
+
+  if (pager) {
+    pager.style.display = pages > 1 ? 'flex' : 'none';
+    const count = document.getElementById('customers-count');
+    const prev  = document.getElementById('customers-prev');
+    const next  = document.getElementById('customers-next');
+    if (count) count.textContent =
+      `${start + 1}–${start + shown.length} of ${customers.length.toLocaleString()}`
+      + (search ? ' matching' : ' customers');
+    if (prev) prev.disabled = customersPageIndex === 0;
+    if (next) next.disabled = customersPageIndex >= pages - 1;
+  }
+
+  tbody.innerHTML = shown.map(c => `
     <tr>
       <td>
         <div style="display:flex;align-items:center;gap:10px">
