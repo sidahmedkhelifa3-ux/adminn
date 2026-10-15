@@ -11651,6 +11651,22 @@ html,body{height:100%;font-family:'Inter',sans-serif;color:var(--text);backgroun
         </div>
       </div>
 
+      <!-- Announcing the offer. Ticked by default for a new one and cleared
+           when editing, because fixing a typo must not re-notify everybody.
+           openTreatModal() sets it; this markup only says where it lives. -->
+      <label id="tr-notify-row" style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;
+        padding:13px 14px;margin:4px 0 16px;border:1.5px solid var(--border);border-radius:12px;background:var(--card)">
+        <input type="checkbox" id="tr-notify" checked
+          style="width:17px;height:17px;margin-top:1px;flex-shrink:0;accent-color:var(--brown);cursor:pointer">
+        <span>
+          <span style="font-size:13.5px;font-weight:600;color:var(--text)">Tell every customer about this</span>
+          <span id="tr-notify-sub" style="display:block;font-size:11.5px;color:var(--muted);margin-top:3px;line-height:1.55">
+            Sends a notification to their phone, adds it to the bell in the app, and emails everyone who
+            opted in. Free, and there is no undo once it goes.
+          </span>
+        </span>
+      </label>
+
       <div style="display:flex;gap:10px">
         <button id="tr-save-btn" onclick="saveTreat()" class="btn btn-primary" style="flex:1">Save Treat</button>
         <button onclick="closeTreatModal()" class="btn btn-ghost" style="flex:1">Cancel</button>
@@ -14330,7 +14346,7 @@ function renderOverview() {
     custEl.innerHTML = adminData.customers.slice(0,4).map(c => `
       <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
         <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--brown),var(--gold));display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:13px;flex-shrink:0">${(c.name||'?')[0].toUpperCase()}</div>
-        <div style="flex:1"><div style="font-size:13px;font-weight:500">${c.name}</div><div style="font-size:11px;color:var(--muted)">${c.email}</div></div>
+        <div style="flex:1"><div style="font-size:13px;font-weight:500">${escapeHtml(c.name)}</div><div style="font-size:11px;color:var(--muted)">${escapeHtml(c.email)}</div></div>
         <span class="status-badge status-${c.tier||'Bronze'}">${c.tier||'Bronze'}</span>
       </div>`).join('') || '<div style="padding:24px;text-align:center;color:var(--muted)">No customers yet</div>';
   }
@@ -14678,14 +14694,22 @@ async function savePost() {
   }
 }
 
-/** Broadcasts a "new news feed post" alert: in-app bell notification + real Web Push, to every customer. */
-async function notifyAllOfNewPost(title, body, image_url) {
-  const pushTitle = title ? title : 'HEY CAT';
-  const pushBody  = body  ? body  : 'Check out what\'s new at HEY CAT! 🐾';
+/** Broadcasts to every customer at once: the bell inside the app, a push
+ *  notification on their phone, and an email to everyone who opted in.
+ *
+ *  Used by news posts and by offers. `icon` and the fallback wording are the
+ *  only things that differ between them, so they are parameters rather than a
+ *  second copy of this function — send-push is the only thing that should know
+ *  how a device is reached, and this is the only thing that should know how a
+ *  broadcast is shaped.
+ */
+async function notifyAllOfNewPost(title, body, image_url, icon = '📰', fallbackBody = null) {
+  const pushTitle = title ? title : 'HEYCAT';
+  const pushBody  = body  ? body  : (fallbackBody || 'Check out what\'s new at HEYCAT! 🐾');
 
   // 1. Write to notifications table (in-app bell) — broadcast to all (customer_id: null)
   try {
-    await db.from('notifications').insert({ customer_id: null, icon: '📰', title: pushTitle, body: pushBody, image_url: image_url || null });
+    await db.from('notifications').insert({ customer_id: null, icon, title: pushTitle, body: pushBody, image_url: image_url || null });
   } catch (e) {
     console.warn('[HEYCAT ADMIN] In-app notification insert failed:', e);
   }
@@ -14700,7 +14724,7 @@ async function notifyAllOfNewPost(title, body, image_url) {
         'Content-Type':  'application/json',
         'Authorization': `Bearer ${token || SUPABASE_KEY}`,
       },
-      body: JSON.stringify({ title: pushTitle, body: pushBody, icon: '📰', url: '/', image_url: image_url || undefined }),
+      body: JSON.stringify({ title: pushTitle, body: pushBody, icon, url: '/', image_url: image_url || undefined }),
     });
     if (!res.ok) {
       const err = await res.text();
@@ -14828,8 +14852,22 @@ function openAddTreatModal() {
   document.getElementById('tr-img-tag').src = '';
   document.getElementById('tr-img-placeholder').style.display = 'flex';
   document.getElementById('tr-img-input').value = '';
+  trSetNotifyRow(true);
   document.getElementById('tr-modal').style.display = 'block';
   document.getElementById('tr-modal-overlay').style.display = 'block';
+}
+
+/* A new offer is worth announcing, so the box starts ticked. Editing one is
+   usually a typo fix, so it starts clear and the wording says why — sending
+   the same offer to everyone twice is not recoverable. */
+function trSetNotifyRow(isNew) {
+  const box = document.getElementById('tr-notify');
+  const sub = document.getElementById('tr-notify-sub');
+  if (!box || !sub) return;
+  box.checked = isNew;
+  sub.textContent = isNew
+    ? 'Sends a notification to their phone, adds it to the bell in the app, and emails everyone who opted in. Free, and there is no undo once it goes.'
+    : 'Off by default when editing — customers have already been told about this offer. Tick it only if the change is worth announcing again.';
 }
 
 function openEditTreat(id) {
@@ -14857,6 +14895,7 @@ function openEditTreat(id) {
     document.getElementById('tr-img-placeholder').style.display = 'flex';
   }
   document.getElementById('tr-img-input').value = '';
+  trSetNotifyRow(false);
   document.getElementById('tr-modal').style.display = 'block';
   document.getElementById('tr-modal-overlay').style.display = 'block';
 }
@@ -14922,9 +14961,31 @@ async function saveTreat() {
   adminData.treats.sort((a,b) => (a.sort_order||0) - (b.sort_order||0));
   btn.disabled = false; btn.textContent = 'Save Treat';
   if (error) { toast('❌ ' + error.message); return; }
+
+  // Read the box before closing the modal — closeTreatModal() can clear it.
+  const announce = document.getElementById('tr-notify')?.checked;
+  const wasEditing = !!trEditingId;
+
   closeTreatModal();
   renderTreatsPanel();
-  toast(trEditingId ? '✅ Treat updated' : '✅ Treat added');
+  toast(wasEditing ? '✅ Treat updated' : '✅ Treat added');
+
+  /* The offer is saved either way. Announcing it is a second, separate thing
+     that can fail on its own — a push that does not go out must never look
+     like an offer that did not save. */
+  if (announce) {
+    const pushTitle = headline || title || '🎁 New offer at HEYCAT';
+    const pushBody  = subtitle || description ||
+      (promo_code ? `Use code ${promo_code} — tap to see it.` : 'Tap to see what we have for you today.');
+    try {
+      await notifyAllOfNewPost(pushTitle, pushBody, image_url, '🎁',
+        'There is something new in Treats — tap to take a look.');
+      toast('📣 Customers notified');
+    } catch (e) {
+      console.warn('[HEYCAT ADMIN] offer broadcast failed:', e);
+      toast('⚠️ Offer saved, but the notification failed to send');
+    }
+  }
 }
 
 async function deleteTreat(id) {
@@ -16287,24 +16348,37 @@ function filterCustomers(q) {
       <td>
         <div style="display:flex;align-items:center;gap:10px">
           <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--brown),var(--gold));display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:14px;flex-shrink:0">${(c.name||'?')[0].toUpperCase()}</div>
-          <div style="font-size:13px;font-weight:600">${c.name || 'Unknown'}</div>
+          <div style="font-size:13px;font-weight:600">${escapeHtml(c.name || 'Unknown')}</div>
         </div>
       </td>
-      <td style="font-size:12px;color:var(--muted)">${c.email || ''}</td>
+      <td style="font-size:12px;color:var(--muted)">${escapeHtml(c.email)}</td>
       <td style="text-align:center;font-weight:600">${c.orders_count||0}</td>
       <td style="font-weight:700;color:var(--brown)">${(c.points||0).toLocaleString()} DA</td>
       <td><span class="status-badge status-${c.tier||'Bronze'}">${c.tier||'Bronze'}</span></td>
       <td>
         <div style="display:flex;gap:6px">
-          <button onclick="addBonusPoints('${c.id}','${(c.name||'').replace(/'/g,"\\'")}')" style="border:1.5px solid var(--brown);background:transparent;color:var(--brown);border-radius:6px;padding:5px 10px;font-size:11px;cursor:pointer;font-weight:600">+ Amount</button>
-          <button onclick="redeemFreeDrink('${c.id}','${(c.name||'').replace(/'/g,"\\'")}')" style="border:1.5px solid var(--gold);background:transparent;color:var(--gold);border-radius:6px;padding:5px 10px;font-size:11px;cursor:pointer;font-weight:600">🎁 Redeem</button>
-          <button onclick="deleteCustomer('${c.id}','${(c.name||'').replace(/'/g,"\\'")}')" style="border:none;background:#FEE2E2;color:var(--error);border-radius:6px;padding:5px 10px;font-size:11px;cursor:pointer;font-weight:600">Remove</button>
+          <button onclick="addBonusPoints('${c.id}')" style="border:1.5px solid var(--brown);background:transparent;color:var(--brown);border-radius:6px;padding:5px 10px;font-size:11px;cursor:pointer;font-weight:600">+ Amount</button>
+          <button onclick="redeemFreeDrink('${c.id}')" style="border:1.5px solid var(--gold);background:transparent;color:var(--gold);border-radius:6px;padding:5px 10px;font-size:11px;cursor:pointer;font-weight:600">🎁 Redeem</button>
+          <button onclick="deleteCustomer('${c.id}')" style="border:none;background:#FEE2E2;color:var(--error);border-radius:6px;padding:5px 10px;font-size:11px;cursor:pointer;font-weight:600">Remove</button>
         </div>
       </td>
     </tr>`).join('');
 }
 
-async function deleteCustomer(id, name) {
+/* The name is looked up here rather than passed in from the markup.
+   It used to travel through an inline onclick attribute, escaped for single
+   quotes only — so a customer who signed up as  Ali" onmouseover="…  closed
+   the attribute and got their own code into the dashboard. Customers choose
+   their own names, and this dashboard runs as an admin, so that was a way for
+   anyone with an account to act as the shop. Passing the id alone removes the
+   question entirely. */
+function customerName(id) {
+  const c = adminData.customers.find(x => x.id === id);
+  return (c && c.name) || 'this customer';
+}
+
+async function deleteCustomer(id) {
+  const name = customerName(id);
   if (!confirm(`Remove "${name}" permanently?\n\nThis will delete their profile, points history, and notifications. They will no longer appear anywhere in the dashboard. This cannot be undone.`)) return;
 
   // Delete all related data first
@@ -16368,13 +16442,13 @@ function filterSupportRequests(q) {
   tbody.innerHTML = reqs.map(r => `
     <tr>
       <td>
-        <div style="font-size:13px;font-weight:600">${r.name || 'Unknown'}</div>
-        <div style="font-size:11px;color:var(--muted)">${r.email || ''}</div>
+        <div style="font-size:13px;font-weight:600">${escapeHtml(r.name || 'Unknown')}</div>
+        <div style="font-size:11px;color:var(--muted)">${escapeHtml(r.email)}</div>
       </td>
-      <td style="font-size:13px;font-weight:500;max-width:160px">${r.subject || '—'}</td>
+      <td style="font-size:13px;font-weight:500;max-width:160px">${escapeHtml(r.subject || '—')}</td>
       <td style="font-size:12px;color:var(--muted);max-width:260px">
-        ${(r.message||'').substring(0,100)}${(r.message||'').length>100?'…':''}
-        ${r.admin_response ? `<div style="margin-top:6px;padding-top:6px;border-top:1px dashed var(--border);color:var(--brown)"><strong>You replied:</strong> ${r.admin_response.substring(0,80)}${r.admin_response.length>80?'…':''}</div>` : ''}
+        ${escapeHtml((r.message||'').substring(0,100))}${(r.message||'').length>100?'…':''}
+        ${r.admin_response ? `<div style="margin-top:6px;padding-top:6px;border-top:1px dashed var(--border);color:var(--brown)"><strong>You replied:</strong> ${escapeHtml(r.admin_response.substring(0,80))}${r.admin_response.length>80?'…':''}</div>` : ''}
       </td>
       <td style="font-size:12px;color:var(--muted)">${r.created_at ? new Date(r.created_at).toLocaleDateString() : ''}</td>
       <td><span class="status-badge ${r.status === 'resolved' ? 'status-Platinum' : 'status-new'}">${r.status === 'resolved' ? 'Resolved' : 'Open'}</span></td>
@@ -16723,7 +16797,7 @@ function showScanResultFor(c) {
       <div style="display:flex;align-items:center;gap:12px;background:var(--beige);border-radius:14px;padding:12px 14px;margin-bottom:16px;text-align:left">
         <div style="width:46px;height:46px;border-radius:50%;background:var(--brown);color:#fff;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;flex-shrink:0">${initials}</div>
         <div style="flex:1;min-width:0">
-          <div style="font-size:15px;font-weight:700;color:var(--brown);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.name}</div>
+          <div style="font-size:15px;font-weight:700;color:var(--brown);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(c.name)}</div>
           <div style="font-size:11px;color:var(--muted)">${(c.points||0).toLocaleString()} DA spent · ${c.tier||'Bronze'}</div>
         </div>
       </div>
@@ -16893,7 +16967,7 @@ async function confirmScanPoints() {
 
     scanFeedback(true);   // celebratory buzz + beep on a completed transaction
     const scanResult = document.getElementById('scan-result');
-    if (scanResult) scanResult.innerHTML = `<div style="padding:20px;text-align:center;color:var(--muted);animation:scanResultIn 0.35s ease"><div style="font-size:36px;margin-bottom:8px">🎉</div><div style="font-size:15px;color:var(--brown);font-weight:700;margin-bottom:4px">+${pts.toLocaleString()} DA added for ${c.name}!</div><span style="font-size:12px">${itemsSummary}</span><button class="btn btn-gold" style="width:100%;margin-top:16px" onclick="scanNextCustomer()">📷 Scan Next Customer</button></div>`;
+    if (scanResult) scanResult.innerHTML = `<div style="padding:20px;text-align:center;color:var(--muted);animation:scanResultIn 0.35s ease"><div style="font-size:36px;margin-bottom:8px">🎉</div><div style="font-size:15px;color:var(--brown);font-weight:700;margin-bottom:4px">+${pts.toLocaleString()} DA added for ${escapeHtml(c.name)}!</div><span style="font-size:12px">${escapeHtml(itemsSummary)}</span><button class="btn btn-gold" style="width:100%;margin-top:16px" onclick="scanNextCustomer()">📷 Scan Next Customer</button></div>`;
     toast(`✅ Added ${pts.toLocaleString()} DA to ${c.name}`);
     // Remembered so a miskeyed amount can be fixed without editing the customer
     recordLastAward(historyRow && historyRow.id, customerId, c.name, pts, itemsSummary);
@@ -16980,7 +17054,7 @@ function populateQuickCustomerDropdown() {
   const sel = document.getElementById('quick-customer');
   if (!sel) return;
   sel.innerHTML = '<option value="">Select customer…</option>' +
-    adminData.customers.map(c => `<option value="${c.id}">${c.name} (${(c.points||0).toLocaleString()} DA)</option>`).join('');
+    adminData.customers.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)} (${(c.points||0).toLocaleString()} DA)</option>`).join('');
 }
 
 // ════════════════════════════════════════
@@ -17014,10 +17088,11 @@ function quickAddPoints() {
   if (!pts || pts <= 0) { toast('Enter a valid amount in DA'); return; }
   const c = adminData.customers.find(c => c.id === custId);
   if (!c) { toast('Customer not found'); return; }
-  addBonusPoints(custId, c.name || 'Customer', pts);
+  addBonusPoints(custId, pts);
 }
 
-async function addBonusPoints(customerId, name, ptsOverride) {
+async function addBonusPoints(customerId, ptsOverride) {
+  const name = customerName(customerId);
   const pts = ptsOverride || parseInt(prompt(`Add bonus amount (DA) to ${name}:\nHow much did they spend?`));
   if (!pts || pts <= 0) return;
   const c = adminData.customers.find(c => c.id === customerId);
@@ -17041,7 +17116,8 @@ async function addBonusPoints(customerId, name, ptsOverride) {
 // Manually reset a customer's free-drink progress bar to 0.
 // This does NOT touch `points` or `tier` — those stay lifetime/cumulative.
 // Only triggered by staff, never automatic.
-async function redeemFreeDrink(customerId, name) {
+async function redeemFreeDrink(customerId) {
+  const name = customerName(customerId);
   const c = adminData.customers.find(c => c.id === customerId);
   if (!c) return;
   const current = c.drink_progress || 0;
@@ -17255,7 +17331,7 @@ function renderCounterCustomerOptions(query) {
 
   box.innerHTML = matches.map(c => `
     <div class="co-dropdown-item" onclick='selectCounterCustomer(${JSON.stringify(c.id)})'>
-      <span>${c.name || 'Unnamed'} <span class="co-dd-id">${c.email || ''}</span></span>
+      <span>${escapeHtml(c.name || 'Unnamed')} <span class="co-dd-id">${escapeHtml(c.email)}</span></span>
       <span class="status-badge status-${c.tier || 'Bronze'}">${(c.points||0).toLocaleString()} DA</span>
     </div>`).join('');
   box.classList.add('open');
@@ -17315,8 +17391,8 @@ function renderCounterSelectedCustomer() {
     <div class="co-customer-chip">
       <div class="co-customer-chip-avatar">${initials}</div>
       <div style="flex:1">
-        <div style="font-size:14px;font-weight:700;color:var(--dark)">${c.name || 'Unnamed'}</div>
-        <div style="font-size:12px;color:var(--muted)">${c.email || ''}</div>
+        <div style="font-size:14px;font-weight:700;color:var(--dark)">${escapeHtml(c.name || 'Unnamed')}</div>
+        <div style="font-size:12px;color:var(--muted)">${escapeHtml(c.email)}</div>
       </div>
       <span class="status-badge status-${c.tier || 'Bronze'}">${c.tier || 'Bronze'}</span>
       <div style="text-align:right;min-width:70px">
