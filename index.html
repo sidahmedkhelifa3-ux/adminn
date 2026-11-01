@@ -11245,6 +11245,9 @@ html,body{height:100%;font-family:'Inter',sans-serif;color:var(--text);backgroun
   <div class="nav-item" onclick="switchPanel('customers',this)">
     <span class="nav-icon"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-1a4 4 0 0 1 4-4h3a4 4 0 0 1 4 4v1"/><circle cx="9.5" cy="8" r="3.5"/><path d="M17 14.8a4 4 0 0 1 3 3.87v.83"/><path d="M15.5 4.8a3.5 3.5 0 0 1 0 6.4"/></svg></span> Customers
   </div>
+  <div class="nav-item" onclick="switchPanel('reservations',this)">
+    <span class="nav-icon"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.2" y="5.2" width="17.6" height="15.6" rx="2.6"/><path d="M3.2 9.6h17.6M8 3.2v4M16 3.2v4"/><path d="M8.4 14h7.2"/></svg></span> Reservations<span id="reservations-nav-badge" class="nav-badge" style="display:none"></span>
+  </div>
   <div class="nav-item" onclick="switchPanel('scanner',this)">
     <span class="nav-icon"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8.5V6.2A2.2 2.2 0 0 1 6.2 4h2.3M15.5 4h2.3A2.2 2.2 0 0 1 20 6.2v2.3M20 15.5v2.3a2.2 2.2 0 0 1-2.2 2.2h-2.3M8.5 20H6.2A2.2 2.2 0 0 1 4 17.8v-2.3"/><path d="M4 12h16"/></svg></span> QR Scanner
   </div>
@@ -12289,6 +12292,49 @@ html,body{height:100%;font-family:'Inter',sans-serif;color:var(--text);backgroun
     </div>
 
     <!-- ══════════════════════════════════════
+         PANEL: RESERVATIONS
+         The booking itself happens on WhatsApp — the customer's request opens
+         a chat and the shop replies. This panel is the shop's own copy, so
+         "who is coming tonight" is a glance rather than a scroll through a
+         conversation. Status is set here; the customer is told on WhatsApp.
+    ══════════════════════════════════════ -->
+    <div id="panel-reservations" class="panel">
+      <div class="section-title">Reservations</div>
+      <div class="section-sub">Table requests from the app. The booking is agreed on WhatsApp — this is your record of it.</div>
+
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:18px 0">
+        <div class="tab-bar" style="margin:0;padding:3px">
+          <button class="tab-btn active" id="rsv-filter-upcoming" onclick="setReservationFilter('upcoming')">Upcoming</button>
+          <button class="tab-btn" id="rsv-filter-today" onclick="setReservationFilter('today')">Today</button>
+          <button class="tab-btn" id="rsv-filter-past" onclick="setReservationFilter('past')">Past</button>
+          <button class="tab-btn" id="rsv-filter-all" onclick="setReservationFilter('all')">All</button>
+        </div>
+        <div class="search-wrap" style="flex:1;min-width:200px">
+          <input placeholder="Search name or phone..." oninput="renderReservationsPanel()">
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="loadReservations(true)">↻ Refresh</button>
+      </div>
+
+      <div class="card" style="padding:0;overflow:hidden">
+        <div class="table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>When</th>
+                <th>Who</th>
+                <th>People</th>
+                <th>Note</th>
+                <th>Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="reservations-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
          PANEL: SUPPORT
     ══════════════════════════════════════ -->
     <div id="panel-support" class="panel">
@@ -12539,7 +12585,7 @@ html,body{height:100%;font-family:'Inter',sans-serif;color:var(--text);backgroun
 // ════════════════════════════════════════
 // STATE
 // ════════════════════════════════════════
-let adminData = { giftCards:[], homePosts:[], customers:[], menuItems:[], milestones:[], tiers:[], supportRequests:[], treats:[], cats:[] };
+let adminData = { reservations:null, giftCards:[], homePosts:[], customers:[], menuItems:[], milestones:[], tiers:[], supportRequests:[], treats:[], cats:[] };
 let realtimeChannel    = null;
 let currentPanelName   = 'overview';
 
@@ -12670,6 +12716,8 @@ async function loadAllData() {
   loadSplashDesign();
   // ...and the clip that plays on the way in
   loadIntroVideo();
+  // ...and tonight's bookings, so the sidebar badge is right on arrival
+  loadReservations();
   // ...and the wording of the once-a-day message
   loadDailyMessages();
 
@@ -12711,6 +12759,137 @@ async function saveFreeCoffeeThreshold() {
   const msg = document.getElementById('free-coffee-saved-msg');
   if (msg) { msg.style.display = 'inline'; setTimeout(() => msg.style.display = 'none', 2500); }
   toast(`✅ Free coffee threshold set to ${val.toLocaleString()} DA`);
+}
+
+// ════════════════════════════════════════
+// RESERVATIONS
+//
+// Loaded on demand rather than with everything else at sign-in: most visits to
+// this dashboard are not about bookings, and this table grows forever while
+// the panel only ever wants a slice of it.
+//
+// If the reservations table does not exist yet, every function here degrades
+// to an empty list with an explanation rather than throwing — the customer app
+// writes to it best-effort for the same reason.
+// ════════════════════════════════════════
+let reservationFilter = 'upcoming';
+let reservationsLoaded = false;
+
+async function loadReservations(force) {
+  if (reservationsLoaded && !force) return;
+  const tbody = document.getElementById('reservations-tbody');
+  if (tbody && !adminData.reservations) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--muted)">Loading…</td></tr>';
+  }
+  // Six months back is plenty of history for a coffee shop and keeps this from
+  // becoming a slow query in a year's time.
+  const since = new Date(Date.now() - 182 * 86400000).toISOString();
+  const { data, error } = await db.from('reservations')
+    .select('*').gte('reserve_at', since).order('reserve_at', { ascending: true });
+
+  if (error) {
+    adminData.reservations = [];
+    reservationsLoaded = true;
+    if (tbody) {
+      const missing = /does not exist|relation|schema cache/i.test(error.message || '');
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--muted)">
+        ${missing
+          ? 'The reservations table has not been created yet. Run <code>supabase/migrations/reservations.sql</code> in the SQL editor.'
+          : 'Could not load reservations: ' + escapeHtml(error.message)}
+      </td></tr>`;
+    }
+    return;
+  }
+  adminData.reservations = data || [];
+  reservationsLoaded = true;
+  renderReservationsPanel();
+  updateReservationsBadge();
+}
+
+function setReservationFilter(f) {
+  reservationFilter = f;
+  ['upcoming', 'today', 'past', 'all'].forEach(k => {
+    const b = document.getElementById('rsv-filter-' + k);
+    if (b) b.classList.toggle('active', k === f);
+  });
+  renderReservationsPanel();
+}
+
+// Pending bookings in the future are the ones that need a human to reply, so
+// that is what the sidebar counts.
+function updateReservationsBadge() {
+  const badge = document.getElementById('reservations-nav-badge');
+  if (!badge) return;
+  const now = Date.now();
+  const n = (adminData.reservations || []).filter(r =>
+    r.status === 'pending' && new Date(r.reserve_at).getTime() > now).length;
+  badge.textContent = n;
+  badge.style.display = n ? '' : 'none';
+}
+
+function renderReservationsPanel() {
+  const tbody = document.getElementById('reservations-tbody');
+  if (!tbody) return;
+  if (!reservationsLoaded) { loadReservations(); return; }
+
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const endOfToday = startOfToday + 86400000;
+  const search = (document.querySelector('#panel-reservations .search-wrap input')?.value || '').toLowerCase();
+
+  let rows = (adminData.reservations || []).filter(r => {
+    const t = new Date(r.reserve_at).getTime();
+    if (reservationFilter === 'upcoming' && t < now.getTime()) return false;
+    if (reservationFilter === 'today' && (t < startOfToday || t >= endOfToday)) return false;
+    if (reservationFilter === 'past' && t >= now.getTime()) return false;
+    return true;
+  });
+  if (reservationFilter === 'past') rows = rows.slice().reverse();
+  if (search) rows = rows.filter(r =>
+    (r.name || '').toLowerCase().includes(search) || (r.phone || '').toLowerCase().includes(search));
+
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--muted)">No reservations here</td></tr>';
+    return;
+  }
+
+  const badge = { pending: 'status-new', confirmed: 'status-Platinum', seated: 'status-Gold', cancelled: 'status-Bronze' };
+
+  tbody.innerHTML = rows.map(r => {
+    const d = new Date(r.reserve_at);
+    const when = isNaN(d) ? '—' : d.toLocaleString('en-GB',
+      { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+    const soon = !isNaN(d) && d.getTime() >= startOfToday && d.getTime() < endOfToday;
+    const wa = (r.phone || '').replace(/[^0-9]/g, '');
+    return `
+    <tr${soon ? ' style="background:rgba(232,184,75,.08)"' : ''}>
+      <td style="white-space:nowrap;font-weight:600">${escapeHtml(when)}</td>
+      <td>
+        <div style="font-size:13px;font-weight:600">${escapeHtml(r.name || 'Unknown')}</div>
+        <div style="font-size:11px;color:var(--muted)">${escapeHtml(r.phone || '')}</div>
+      </td>
+      <td style="text-align:center;font-weight:700">${escapeHtml(String(r.guests || '—'))}</td>
+      <td style="font-size:12px;color:var(--muted);max-width:220px">${escapeHtml(r.note || '')}</td>
+      <td><span class="status-badge ${badge[r.status] || 'status-new'}">${escapeHtml(r.status || 'pending')}</span></td>
+      <td>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          ${wa ? `<a href="https://wa.me/${wa}" target="_blank" rel="noopener" style="text-decoration:none;border:1.5px solid #25D366;color:#128C7E;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600">WhatsApp</a>` : ''}
+          ${r.status !== 'confirmed' ? `<button onclick="setReservationStatus('${r.id}','confirmed')" style="border:1.5px solid var(--brown);background:transparent;color:var(--brown);border-radius:6px;padding:5px 10px;font-size:11px;cursor:pointer;font-weight:600">Confirm</button>` : ''}
+          ${r.status !== 'cancelled' ? `<button onclick="setReservationStatus('${r.id}','cancelled')" style="border:none;background:#FEE2E2;color:var(--error);border-radius:6px;padding:5px 10px;font-size:11px;cursor:pointer;font-weight:600">Cancel</button>` : ''}
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+async function setReservationStatus(id, status) {
+  const { error } = await db.from('reservations').update({ status }).eq('id', id);
+  if (error) { toast('❌ ' + error.message); return; }
+  const r = (adminData.reservations || []).find(x => x.id === id);
+  if (r) r.status = status;
+  renderReservationsPanel();
+  updateReservationsBadge();
+  toast(status === 'confirmed' ? '✅ Marked confirmed' : '🚫 Marked cancelled');
 }
 
 // ════════════════════════════════════════
@@ -14268,7 +14447,8 @@ function toggleMoreMenu() {
 const panelTitles = {
   overview:'Overview', giftcards:'Gift Cards', homeposts:'Home Posts', treats:'Treats / Offers',
   cats:'Cats', rewards:'Rewards', customers:'Customers', scanner:'QR Scanner', support:'Support',
-  apptexts:'App Texts', welcome:'Welcome Designer', intro:'Intro Video', daily:'Daily Message'
+  apptexts:'App Texts', welcome:'Welcome Designer', intro:'Intro Video', daily:'Daily Message',
+  reservations:'Reservations'
 };
 const panelSubs = {
   overview:"Here's what's happening today",
@@ -14281,6 +14461,7 @@ const panelSubs = {
   scanner:'Scan customer QR to add points',
   support:'Problem reports submitted by customers',
   apptexts:'Wording on the customer welcome screen',
+  reservations:'Table requests from the app',
   welcome:'Design the first screen customers see',
   intro:'The clip that plays while the app opens',
   daily:'The message every customer gets once a day'
@@ -14326,6 +14507,7 @@ function renderCurrentPanel() {
   if (currentPanelName === 'cats')         renderCatsPanel();
   if (currentPanelName === 'rewards')      { renderRewardsTable(); renderTiersTable(); }
   if (currentPanelName === 'support')      renderSupportTable();
+  if (currentPanelName === 'reservations') renderReservationsPanel();
   if (currentPanelName === 'welcome')      renderWelcomeDesigner();
   if (currentPanelName === 'intro')        renderIntroPanel();
   if (currentPanelName === 'daily')        renderDailyPanel();
